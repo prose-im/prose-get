@@ -1,0 +1,6 @@
+types {
+    text/plain  txt;
+
+    # Notice: serve scripts as text, so that browsers do not trigger a download.
+    text/plain  sh;
+}

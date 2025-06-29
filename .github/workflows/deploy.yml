@@ -12,6 +12,9 @@ jobs:
     permissions:
       packages: write
 
+    outputs:
+      revision: ${{ steps.current_revision.outputs.short }}
+
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
@@ -65,4 +68,4 @@ jobs:
           NOMAD_HTTP_AUTH: ${{ secrets.NOMAD_HTTP_AUTH }}
         run: |
           nomad var get nomad/jobs/prose-get | \
-            nomad var put -out none - IMAGE_TAG=${{ needs.build.outputs.revision }}
+            nomad var put -out none - IMAGE_TAG=${{ needs.ship.outputs.revision }}

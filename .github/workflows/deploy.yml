@@ -48,3 +48,21 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           push: true
+
+  deploy:
+    needs: [ship]
+    environment: get.prose.org
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Nomad
+        uses: hashicorp/setup-nomad@v1.0.0
+
+      - name: Request deployment to Nomad
+        env:
+          NOMAD_ADDR: ${{ vars.NOMAD_ADDR }}
+          NOMAD_TOKEN: ${{ secrets.NOMAD_TOKEN }}
+          NOMAD_HTTP_AUTH: ${{ secrets.NOMAD_HTTP_AUTH }}
+        run: |
+          nomad var get nomad/jobs/prose-get | \
+            nomad var put -out none - IMAGE_TAG=${{ needs.build.outputs.revision }}

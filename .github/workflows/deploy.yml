@@ -1,0 +1,50 @@
+on:
+  push:
+    branches:
+      - production
+
+name: Build and Deploy
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get current revision
+        id: current_revision
+        uses: prompt/actions-commit-hash@v3
+
+      - name: Acquire Docker image metadata
+        id: metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=${{ steps.current_revision.outputs.short }}
+            type=raw,value=latest
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          push: true

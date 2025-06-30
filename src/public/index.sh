@@ -434,9 +434,9 @@ step_run_prose() {
   prose_get_file templates/prose.service /etc/systemd/system/prose.service
   systemctl daemon-reload
   systemctl enable prose
-  log_task_success "$(dormat_code systemd) service $(format_code prose) enabled."
+  log_task_success "$(format_code systemd) service $(format_code prose) enabled."
   systemctl start prose
-  log_task_success "$(dormat_code systemd) service $(format_code prose) started."
+  log_task_success "$(format_code systemd) service $(format_code prose) started."
 
   section_end 'Prose is running.'
 }

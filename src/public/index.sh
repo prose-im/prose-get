@@ -335,19 +335,19 @@ step_prose_config() {
   # Fill the file with answers from the user.
   if [ -n "${SMTP_HOST-}" ]; then
     set_config() {
-	local key="${1:?Expected a config name}"
-	local value="${2:?Expected a value}"
-        replacements+=(-e "s~\{${key}\}~${value}~g")
+      local key="${1:?Expected a config name}"
+      local value="${2:?Expected a value}"
+      replacements+=(-e "s~\{${key}\}~${value}~g")
     }
 
     set_config_opt() {
-	local key="${1:?Expected a config name}"
-	local value="${2?Expected a value}"
-        if [ -n "${value-}" ]; then
-          replacements+=(-e "s~\{${key}\}~${value}~g")
-	else
-          replacements+=(-e 's~^(.*\{'"${key}"'\}.*)$~#\1~g')
-	fi
+      local key="${1:?Expected a config name}"
+      local value="${2?Expected a value}"
+      if [ -n "${value-}" ]; then
+        replacements+=(-e "s~\{${key}\}~${value}~g")
+      else
+        replacements+=(-e 's~^(.*\{'"${key}"'\}.*)$~#\1~g')
+      fi
     }
 
     set_config company_name "${COMPANY_NAME:?}"

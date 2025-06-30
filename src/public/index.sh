@@ -96,6 +96,9 @@ section_start() {
 section_end() {
   log_success "$@"
 }
+section_end_todo() {
+  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
+}
 
 
 # ===== Helper functions =====
@@ -407,23 +410,32 @@ step_ssl_certificates_prosody() {
     dim edo apt-get -q install -y certbot
   fi
 
-  certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"
-
-  rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/"${APEX_DOMAIN:?}"/
-
   local cert_renewal_conf_file="/etc/letsencrypt/renewal/${APEX_DOMAIN:?}.conf"
-  if grep -q 'post_hook' "${cert_renewal_conf_file:?}"; then
-    if grep -q 'prosody/certs' "${cert_renewal_conf_file:?}"; then
-      log_task_maybe "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Assuming it’s correct."
-    else
-      TODO_LIST+=("Add $(format_code "/bin/bash -c 'rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/\"${APEX_DOMAIN:?}\"/'") your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")
-      log_task_todo "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Manual action required."
-    fi
-  else
-    sed -i '/^\[renewalparams\]$/a post_hook = "'"/bin/bash -c 'rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/\"${APEX_DOMAIN:?}\"/'"'"' "${cert_renewal_conf_file:?}"
-  fi
+  local post_hook="/bin/bash -c 'rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/\"${APEX_DOMAIN:?}\"/'"
+  if certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"; then
+    dim edo rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/"${APEX_DOMAIN:?}"/
 
-  section_end 'Installed SSL certificates for the Server.'
+    if grep -q 'post_hook' "${cert_renewal_conf_file:?}"; then
+      if grep -q 'prosody/certs' "${cert_renewal_conf_file:?}"; then
+        log_task_maybe "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Assuming it’s correct."
+      else
+        TODO_LIST+=("Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")
+        log_task_todo "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Manual action required."
+      fi
+    else
+      dim edo sed -i '/^\[renewalparams\]$/a post_hook = "'"${post_hook}"'"' "${cert_renewal_conf_file:?}"
+    fi
+
+    section_end 'Installed SSL certificates for the Server.'
+  else
+    TODO_LIST+=( \
+      "Generate certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") then put them in $(format_path "/etc/letsencrypt/live/${APEX_DOMAIN:?}")." \
+      "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}")." \
+    )
+    log_task_todo "Certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") not generated. Manual action required."
+
+    section_end_todo 'SSL certificates for the Server not installed.'
+  fi
 }
 step_ssl_certificates_prosody
 

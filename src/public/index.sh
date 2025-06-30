@@ -185,6 +185,16 @@ die() {
   exit 1
 }
 
+link_docs_deploy() {
+  format_hyperlink "docs.prose.org/guides/operating/deploy" "https://docs.prose.org/guides/operating/deploy/"
+}
+link_app_web() {
+  format_hyperlink "prose.${APEX_DOMAIN:?}" "https://prose.${APEX_DOMAIN:?}"
+}
+link_dashboard() {
+  format_hyperlink "admin.prose.${APEX_DOMAIN:?}" "https://admin.prose.${APEX_DOMAIN:?}"
+}
+
 
 # ===== Constants =====
 
@@ -479,17 +489,19 @@ step_reverse_proxy() {
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 
-  section_end "NGINX is serving $(format_hyperlink "prose.${APEX_DOMAIN:?}" "https://prose.${APEX_DOMAIN:?}") and $(format_hyperlink "admin.prose.${APEX_DOMAIN:?}" "https://admin.prose.${APEX_DOMAIN:?}")."
+  section_end NGINX is serving $(link_app_web) and $(link_dashboard).
 }
 step_reverse_proxy
 
 echo
 if [ ${#TODO_LIST[@]} -eq 0 ]; then
   log_success Installation finished!
-  # TODO: Link / instructions to next steps / docs.
+  log_info You can now open $(link_dashboard) and continue setting up your Prose Pod there.
 else
-  log_warn 'Installation is finished, but a few things couldn’t be automated and require manual actions:'
+  log_warn Installation is finished, but a few things couldn’t be automated and require manual actions:
   for item in "${TODO_LIST[@]}"; do
     log_warn "- ${item-}"
   done
+  log_info After it’s done, open $(link_dashboard) and continue setting up your Prose Pod there.
 fi
+log_info For more information, read $(link_docs_deploy).

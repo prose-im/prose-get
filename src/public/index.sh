@@ -66,14 +66,14 @@ log_info() {
   printf "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
 }
 log_warn() {
-  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$*" >&2
+  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(decolor <<< "$*")" >&2
 }
 log_error() {
-  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$*" >&2
+  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(decolor <<< "$*")" >&2
 }
 
 log_success() {
-  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$*"
+  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(decolor <<< "$*")"
 }
 log_task_success() {
   printf "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
@@ -92,7 +92,7 @@ log_question_inline() {
 }
 
 format_code() {
-  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$*"
+  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$(decolor <<< "$*")"
 }
 format_hyperlink() {
   local text="${1:?"Expected hyperlink text"}"

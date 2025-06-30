@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+
+##
+#  Prose Pod installation script
+#
+#  /!\ This script should be ran from your server to setup your own Prose Pod, \
+#      with this command: `curl -L https://get.prose.org | sh`
+#
+#  Copyright 2025, Prose Foundation
+##
+
+
 set -eu
 set -o pipefail
 

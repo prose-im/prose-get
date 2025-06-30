@@ -52,12 +52,13 @@ decolor() {
     | sed -r 's/('"${ANSI_ESC}|${ANSI_ESC_ESC}"')%%%('"${ANSI_NO_DECOLOR}"')/\1\2/g'
 }
 
-if (( ${DRY_RUN:-0} )); then LOG_TRACE=1; fi
-
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
     printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(decolor <<< "$*")" >&2
   fi
+}
+log_dry_run() {
+  printf "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(decolor <<< "$*")" >&2
 }
 log_debug() {
   printf "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
@@ -118,8 +119,10 @@ section_end_todo() {
 # ===== Helper functions =====
 
 edo() {
-  log_trace "$*"
-  if ! (( ${DRY_RUN:-0} )); then
+  if (( ${DRY_RUN:-0} )); then
+    log_dry_run "$*"
+  else
+    log_trace "$*"
     bash -c "$*"
   fi
   status=$?

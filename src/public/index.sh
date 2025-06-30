@@ -127,10 +127,13 @@ edo() {
 }
 
 dim() {
-  printf "${I_DIM}"
+  # NOTE: Do not dim in dry runs because commands will not be ran (thus output)
+  #   anyway. They will be logged as traces and colors would be incorrect in
+  #   this case (for the log line).
+  (( ${DRY_RUN:-0} )) || printf "${I_DIM}"
   "$@"
   status=$?
-  printf "${I_RESET}"
+  (( ${DRY_RUN:-0} )) || printf "${I_RESET}"
   return $status
 }
 

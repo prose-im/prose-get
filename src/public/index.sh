@@ -157,7 +157,7 @@ is_step_skipped() {
 prose_create_dir() {
   local mode="${1:?"Expected a mode"}"
   shift 1
-  install -o prose -g prose -m "$mode" -d "$@"
+  dim edo install -o prose -g prose -m "$mode" -d "$@"
   for p in "$@"; do log_task_success "Created directory $(format_path "$p")."; done
 }
 # Creates fils with the correct owner
@@ -165,7 +165,7 @@ prose_create_dir() {
 prose_create_file() {
   local mode="${1:?"Expected a mode"}"
   shift 1
-  install -o prose -g prose -m "$mode" -T /dev/null "$@"
+  dim edo install -o prose -g prose -m "$mode" -T /dev/null "$@"
   for p in "$@"; do log_task_success "Created file $(format_path "$p")."; done
 }
 # Retrieves a file from `prose-pod-system` then
@@ -174,11 +174,11 @@ prose_get_file() {
   local in_path="${1:?Expected a path in prose-pod-system}"
   local out_path="${2:?Expected a path on the file system}"
 
-  curl -s -L "${PROSE_FILES:?}"/"$in_path" \
-    | sed s/'{your_domain}'/"${APEX_DOMAIN:?}"/g \
-    > "$out_path"
+  dim edo curl -s -L "${PROSE_FILES:?}"/"$in_path" \
+    \| sed s/'{your_domain}'/"${APEX_DOMAIN:?}"/g \
+    \> "$out_path"
 
-  chown prose:prose "$out_path"
+  dim edo chown prose:prose "$out_path"
 
   log_task_success "Created file $(format_path "$out_path")."
 }
@@ -317,14 +317,14 @@ step_create_user_and_group() {
   if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" == "${PROSE_GROUP_NAME:?}" ]; then
     log_trace "Group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") already exists."
   else
-    edo addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}" >/dev/null
+    dim edo addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}" >/dev/null
   fi
 
   # Create user.
   if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" == "${PROSE_USER_NAME:?}" ]; then
     log_trace "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") already exists."
   else
-    edo adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}" >/dev/null
+    dim edo adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}" >/dev/null
   fi
 
   section_end "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") and group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") created (if needed)."
@@ -398,7 +398,7 @@ step_prose_config() {
     )
   fi
 
-  sed -i -E "${replacements[@]}" "${PROSE_CONFIG_FILE:?}"
+  dim edo sed -i -E "${replacements[@]}" "${PROSE_CONFIG_FILE:?}"
 
   section_end "Created the Prose configuration file at $(format_path "${PROSE_CONFIG_FILE:?}")."
 }
@@ -417,7 +417,7 @@ step_ssl_certificates_prosody() {
 
   local cert_renewal_conf_file="/etc/letsencrypt/renewal/${APEX_DOMAIN:?}.conf"
   local post_hook="/bin/bash -c 'rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/\"${APEX_DOMAIN:?}\"/'"
-  if certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"; then
+  if edo certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"; then
     dim edo rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/"${APEX_DOMAIN:?}"/
 
     if grep -q 'post_hook' "${cert_renewal_conf_file:?}"; then
@@ -448,11 +448,11 @@ check_docker_compose_installed() {
   command -v docker >/dev/null && docker compose version >/dev/null 2>&1
 }
 install_docker() {
-  log_info 'Installing Docker Compose…'
+  log_info Installing Docker Compose…
   dim edo curl -s -L https://get.docker.com \| sh
 }
 step_docker_compose() {
-  section_start 'Installing Prose using Docker Compose…'
+  section_start Installing Prose using Docker Compose…
 
   check_docker_compose_installed || install_docker
 
@@ -461,21 +461,21 @@ step_docker_compose() {
 
   prose_get_file compose.yaml "${PROSE_COMPOSE_FILE:?}"
 
-  section_end 'Prose is ready to run.'
+  section_end Prose is ready to run.
 }
 if ! is_step_skipped docker_compose; then step_docker_compose; fi
 
 step_run_prose() {
-  section_start 'Running Prose…'
+  section_start Running Prose…
 
   prose_get_file templates/prose.service /etc/systemd/system/prose.service
-  systemctl daemon-reload
-  systemctl enable prose
+  dim edo systemctl daemon-reload
+  dim edo systemctl enable prose
   log_task_success "$(format_code systemd) service $(format_code prose) enabled."
-  systemctl start prose
+  dim edo systemctl start prose
   log_task_success "$(format_code systemd) service $(format_code prose) started."
 
-  section_end 'Prose is running.'
+  section_end Prose is running.
 }
 if ! is_step_skipped run_prose; then step_run_prose; fi
 
@@ -483,13 +483,13 @@ step_reverse_proxy() {
   section_start 'Configuring NGINX to serve Prose web apps…'
 
   dim edo apt-get -q install -y nginx python3-certbot-nginx
-  certbot certonly --nginx -d "prose.${APEX_DOMAIN:?}" -d "admin.prose.${APEX_DOMAIN:?}"
+  edo certbot certonly --nginx -d "prose.${APEX_DOMAIN:?}" -d "admin.prose.${APEX_DOMAIN:?}"
 
   prose_get_file templates/nginx.conf /etc/nginx/sites-available/"prose.${APEX_DOMAIN:?}"
 
-  ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}" >/dev/null
+  dim edo ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}" >/dev/null
 
-  systemctl reload nginx
+  dim edo systemctl reload nginx
 
   local well_known_dir="$(find /var/www -type d -name *well-known)"
   if [ -n "${well_known_dir-}" ]; then
@@ -497,12 +497,12 @@ step_reverse_proxy() {
     prose_get_file templates/host-meta.json "${well_known_dir:?}"/host-meta.json
   else
     well_known_dir=/var/www/default/.well-known
-    mkdir -p "${well_known_dir:?}"
+    dim edo mkdir -p "${well_known_dir:?}"
     prose_get_file templates/host-meta "${well_known_dir:?}"/host-meta
     prose_get_file templates/host-meta.json "${well_known_dir:?}"/host-meta.json
     prose_get_file templates/nginx-well-known.conf /etc/nginx/sites-available/"${APEX_DOMAIN:?}"
-    ln -s /etc/nginx/sites-{available,enabled}/"${APEX_DOMAIN:?}"
-    systemctl reload nginx
+    dim edo ln -s /etc/nginx/sites-{available,enabled}/"${APEX_DOMAIN:?}" >/dev/null
+    dim edo systemctl reload nginx
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 

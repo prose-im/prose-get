@@ -243,8 +243,6 @@ step_questions() {
   log_question_inline "Where do you want to host Prose? (${PROSE_POD_DOMAIN_DEFAULT:?})"
   read -r PROSE_POD_DOMAIN
   PROSE_POD_DOMAIN="${PROSE_POD_DOMAIN:-"${PROSE_POD_DOMAIN_DEFAULT:?}"}"
-  # IPV4=$(ip -br -4 addr show scope global | awk '{print $3}' | cut -d/ -f1)
-  # IPV6=$(ip -br -6 addr show scope global | awk '{print $3}' | cut -d/ -f1)
 
   # Ask SMTP server info.
   if ask_yes_no 'Do you have a SMTP server Prose could use (e.g. to send invitations)?' y; then
@@ -271,11 +269,6 @@ step_questions() {
   fi
 }
 if ! (( ${SKIP_QUESTIONS:-0} )); then step_questions; fi
-
-#for var in $(compgen -v | grep SMTP_); do declare -p "$var"; done
-#for var in $(compgen -v | grep SKIP_); do declare -p "$var"; done
-
-#die 'Don’t install'
 
 
 # === Install Prose ===

@@ -282,9 +282,6 @@ for arg in "$@"; do
     *) log_error "Unknown argument: $(format_code $arg)."; log_info "$(usage)"; die ;;
   esac
 done
-if (( ${DRY_RUN:-0} )); then
-  log_warn 'Dry run is enabled, actions will be logged instead of being performed.'
-fi
 
 
 # === Greeting ===
@@ -292,6 +289,12 @@ fi
 # Welcome message
 log_info "Hello and welcome to the $(format_hyperlink "Prose" "https://prose.org/") installer script."
 echo
+
+# Dry run warning
+if (( ${DRY_RUN:-0} )); then
+  log_warn 'Dry run is enabled, actions will be logged instead of being performed.'
+  echo
+fi
 
 
 # === Checks ===
@@ -350,7 +353,7 @@ step_questions() {
 
   # Ask SMTP server info.
   if ask_yes_no 'Do you have a SMTP server Prose could use (e.g. to send invitations)?' y; then
-    log_question_inline "  - SMTP host (${APEX_DOMAIN:?}):"
+    log_question_inline "  - SMTP host: (${APEX_DOMAIN:?})"
     read -r SMTP_HOST
     SMTP_HOST="${SMTP_HOST:-"${APEX_DOMAIN:?}"}"
 

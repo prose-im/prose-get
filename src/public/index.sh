@@ -17,62 +17,68 @@ set -o pipefail
 
 # ===== Colors and style =====
 
-C_OFF='\033[0m'
+# Reset all attributes
+A_RESET='\033[0m'
 
-C_BLACK='\033[0;30m'
-C_RED='\033[0;31m'
-C_GREEN='\033[0;32m'
-C_YELLOW='\033[0;33m'
-C_BLUE='\033[0;34m'
-C_PURPLE='\033[0;35m'
-C_CYAN='\033[0;36m'
-C_WHITE='\033[0;37m'
+# Color
+C_BLACK='\033[30m'
+C_RED='\033[31m'
+C_GREEN='\033[32m'
+C_YELLOW='\033[33m'
+C_BLUE='\033[34m'
+C_PURPLE='\033[35m'
+C_CYAN='\033[36m'
+C_WHITE='\033[37m'
+C_RESET='\033[39m'
 
-S_DARK='\033[2m'
-S_DARK_OFF='\033[22m'
+# Intensity
+I_BOLD='\033[1m'
+I_DIM='\033[2m'
+I_RESET='\033[22m'
 
+# Style
 S_UNDERLINE='\033[4m'
 S_UNDERLINE_OFF='\033[24m'
 
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
-    printf "%b %s\n" "${C_PURPLE}T${C_OFF}" "$*" >&2
+    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$*" >&2
   fi
 }
 log_debug() {
-  printf "%b %s\n" "${C_YELLOW}D${C_OFF}" "$*" >&2
+  printf "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
 }
 log_info() {
-  printf "%b %s\n" "${C_BLUE}i${C_OFF}" "$*"
+  printf "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
 }
 log_warn() {
-  printf "%b ${C_YELLOW}%s${C_OFF}\n" "${C_YELLOW}W${C_OFF}" "$*" >&2
+  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$*" >&2
 }
 log_error() {
-  printf "%b ${C_RED}%s${C_OFF}\n" "${C_RED}E${C_OFF}" "$*" >&2
+  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$*" >&2
 }
 
 log_success() {
-  printf "%b %s\n" "${C_GREEN}\u2713${C_OFF}" "$*"
+  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$*"
 }
 log_task_success() {
-  printf "%b ${S_DARK}%s${S_DARK_OFF}\n" "${C_GREEN}\u00B7${C_OFF}" "$*"
+  printf "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
 }
 log_task_maybe() {
-  printf "%b ${S_DARK}%s${S_DARK_OFF}\n" "${C_YELLOW}\u00B7${C_OFF}" "$*"
+  printf "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
 }
 log_task_todo() {
-  printf "%b ${S_DARK}%s${S_DARK_OFF}\n" "${C_RED}\u00B7${C_OFF}" "$*"
+  printf "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
 }
 log_question() {
-  printf "%b %s\n" "${C_CYAN}?${C_OFF}" "$*"
+  printf "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
 }
 log_question_inline() {
-  printf "%b %s " "${C_CYAN}?${C_OFF}" "$*"
+  printf "%b %s " "${C_CYAN}?${C_RESET}" "$*"
 }
 
 format_code() {
-  printf "${C_CYAN}${S_DARK}\`${S_DARK_OFF}%s${S_DARK}\`${S_DARK_OFF}${C_OFF}" "$*"
+  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$*"
 }
 format_hyperlink() {
   local text="${1:?"Expected hyperlink text"}"
@@ -101,10 +107,10 @@ edo() {
 }
 
 dim() {
-  printf "${S_DARK}"
+  printf "${I_DIM}"
   "$@"
   status=$?
-  printf "${S_DARK_OFF}"
+  printf "${I_RESET}"
   return $status
 }
 

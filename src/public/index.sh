@@ -289,14 +289,14 @@ step_create_user_and_group() {
   if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" == "${PROSE_GROUP_NAME:?}" ]; then
     log_trace "Group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") already exists."
   else
-    addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}"
+    edo addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}" >/dev/null
   fi
 
   # Create user.
   if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" == "${PROSE_USER_NAME:?}" ]; then
     log_trace "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") already exists."
   else
-    adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}"
+    edo adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}" >/dev/null
   fi
 
   section_end "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") and group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") created (if needed)."
@@ -450,7 +450,7 @@ step_reverse_proxy() {
 
   prose_get_file templates/nginx.conf /etc/nginx/sites-available/"prose.${APEX_DOMAIN:?}"
 
-  ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}"
+  ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}" >/dev/null
 
   systemctl reload nginx
 

@@ -40,11 +40,23 @@ I_RESET='\033[22m'
 S_UNDERLINE='\033[4m'
 S_UNDERLINE_OFF='\033[24m'
 
+ANSI_ESC='\x1b\['
+ANSI_ESC_ESC='\\\033\['
+ANSI_NO_DECOLOR='(4|24)m'
+
+# Removes ANSI color-related escape codes from the input.
+# Note that it doesn’t remove underline style.
+decolor() {
+  sed -r 's/('"${ANSI_ESC}|${ANSI_ESC_ESC}"')('"${ANSI_NO_DECOLOR}"')/\1%%%\2/g' \
+    | sed -r 's/'"(${ANSI_ESC}|${ANSI_ESC_ESC})"'[0-9;]+m//g' \
+    | sed -r 's/('"${ANSI_ESC}|${ANSI_ESC_ESC}"')%%%('"${ANSI_NO_DECOLOR}"')/\1\2/g'
+}
+
 if (( ${DRY_RUN:-0} )); then LOG_TRACE=1; fi
 
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
-    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$*" >&2
+    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(decolor <<< "$*")" >&2
   fi
 }
 log_debug() {

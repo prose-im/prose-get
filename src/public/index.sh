@@ -282,6 +282,9 @@ for arg in "$@"; do
     *) log_error "Unknown argument: $(format_code $arg)."; log_info "$(usage)"; die ;;
   esac
 done
+if (( ${DRY_RUN:-0} )); then
+  log_warn 'Dry run is enabled, actions will be logged instead of being performed.'
+fi
 
 
 # === Greeting ===

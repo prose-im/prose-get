@@ -550,10 +550,10 @@ step_run_prose() {
   section_start 'Running Prose…'
 
   prose_get_file templates/prose.service /etc/systemd/system/prose.service
-  dim edo systemctl daemon-reload
-  dim edo systemctl enable prose
+  dim edo systemctl -q daemon-reload
+  dim edo systemctl -q enable prose
   log_task_success "$(format_code systemd) service $(format_code prose) enabled."
-  dim edo systemctl start prose
+  dim edo systemctl -q start prose
   log_task_success "$(format_code systemd) service $(format_code prose) started."
 
   section_end 'Prose is running.'
@@ -570,7 +570,7 @@ step_reverse_proxy() {
 
   dim edo ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}" >/dev/null
 
-  dim edo systemctl reload nginx
+  dim edo systemctl -q reload nginx
 
   local well_known_dir="$(find /var/www -type d -name *well-known)"
   if [ -n "${well_known_dir-}" ]; then
@@ -583,7 +583,7 @@ step_reverse_proxy() {
     prose_get_file templates/host-meta.json "${well_known_dir:?}"/host-meta.json
     prose_get_file templates/nginx-well-known.conf /etc/nginx/sites-available/"${APEX_DOMAIN:?}"
     dim edo ln -s /etc/nginx/sites-{available,enabled}/"${APEX_DOMAIN:?}" >/dev/null
-    dim edo systemctl reload nginx
+    dim edo systemctl -q reload nginx
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 

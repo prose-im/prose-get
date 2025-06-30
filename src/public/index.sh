@@ -61,7 +61,7 @@ log_question_inline() {
 }
 
 format_code() {
-  printf '`%s`' "$*"
+  printf "${C_CYAN}${S_DARK}\`${S_DARK_OFF}%s${S_DARK}\`${S_DARK_OFF}${C_OFF}" "$*"
 }
 format_hyperlink() {
   local text="${1:?"Expected hyperlink text"}"
@@ -243,8 +243,6 @@ step_questions() {
   log_question_inline "Where do you want to host Prose? (${PROSE_POD_DOMAIN_DEFAULT:?})"
   read -r PROSE_POD_DOMAIN
   PROSE_POD_DOMAIN="${PROSE_POD_DOMAIN:-"${PROSE_POD_DOMAIN_DEFAULT:?}"}"
-  # IPV4=$(ip -br -4 addr show scope global | awk '{print $3}' | cut -d/ -f1)
-  # IPV6=$(ip -br -6 addr show scope global | awk '{print $3}' | cut -d/ -f1)
 
   # Ask SMTP server info.
   if ask_yes_no 'Do you have a SMTP server Prose could use (e.g. to send invitations)?' y; then
@@ -272,11 +270,6 @@ step_questions() {
 }
 if ! (( ${SKIP_QUESTIONS:-0} )); then step_questions; fi
 
-#for var in $(compgen -v | grep SMTP_); do declare -p "$var"; done
-#for var in $(compgen -v | grep SKIP_); do declare -p "$var"; done
-
-#die 'Don’t install'
-
 
 # === Install Prose ===
 
@@ -289,14 +282,14 @@ step_create_user_and_group() {
   if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" == "${PROSE_GROUP_NAME:?}" ]; then
     log_trace "Group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") already exists."
   else
-    addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}"
+    edo addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}" >/dev/null
   fi
 
   # Create user.
   if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" == "${PROSE_USER_NAME:?}" ]; then
     log_trace "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") already exists."
   else
-    adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}"
+    edo adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}" >/dev/null
   fi
 
   section_end "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") and group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") created (if needed)."
@@ -335,19 +328,19 @@ step_prose_config() {
   # Fill the file with answers from the user.
   if [ -n "${SMTP_HOST-}" ]; then
     set_config() {
-	local key="${1:?Expected a config name}"
-	local value="${2:?Expected a value}"
-        replacements+=(-e "s~\{${key}\}~${value}~g")
+      local key="${1:?Expected a config name}"
+      local value="${2:?Expected a value}"
+      replacements+=(-e "s~\{${key}\}~${value}~g")
     }
 
     set_config_opt() {
-	local key="${1:?Expected a config name}"
-	local value="${2?Expected a value}"
-        if [ -n "${value-}" ]; then
-          replacements+=(-e "s~\{${key}\}~${value}~g")
-	else
-          replacements+=(-e 's~^(.*\{'"${key}"'\}.*)$~#\1~g')
-	fi
+      local key="${1:?Expected a config name}"
+      local value="${2?Expected a value}"
+      if [ -n "${value-}" ]; then
+        replacements+=(-e "s~\{${key}\}~${value}~g")
+      else
+        replacements+=(-e 's~^(.*\{'"${key}"'\}.*)$~#\1~g')
+      fi
     }
 
     set_config company_name "${COMPANY_NAME:?}"
@@ -434,9 +427,9 @@ step_run_prose() {
   prose_get_file templates/prose.service /etc/systemd/system/prose.service
   systemctl daemon-reload
   systemctl enable prose
-  log_task_success "$(dormat_code systemd) service $(format_code prose) enabled."
+  log_task_success "$(format_code systemd) service $(format_code prose) enabled."
   systemctl start prose
-  log_task_success "$(dormat_code systemd) service $(format_code prose) started."
+  log_task_success "$(format_code systemd) service $(format_code prose) started."
 
   section_end 'Prose is running.'
 }
@@ -450,7 +443,7 @@ step_reverse_proxy() {
 
   prose_get_file templates/nginx.conf /etc/nginx/sites-available/"prose.${APEX_DOMAIN:?}"
 
-  ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}"
+  ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}" >/dev/null
 
   systemctl reload nginx
 

@@ -150,12 +150,17 @@ help() {
   exit 0
 }
 
+# Allows passing a pipe as argument.
+REGEX_ALLOW_PIPES='s#\\|#|#'
+# Allows passing redirects (e.g. `2>&1`) as argument.
+REGEX_ALLOW_REDIRECTS='s#([[:digit:]]*)\\>(\\&[[:digit:]]+)?#\1>\2#'
 edo() {
   if (( ${DRY_RUN:-0} )); then
     log_dry_run "$*"
   else
     log_trace "$*"
-    bash -c "$*"
+    # NOTE: `$@`, `"$@"` or `eval $@` would break spaces in arguments.
+    eval $(printf '%q ' "$@" | sed "${REGEX_ALLOW_PIPES:?}" | sed -E "${REGEX_ALLOW_REDIRECTS:?}")
   fi
   status=$?
   return $status

@@ -61,7 +61,7 @@ log_question_inline() {
 }
 
 format_code() {
-  printf '`%s`' "$*"
+  printf "${C_CYAN}${S_DARK}\`${S_DARK_OFF}%s${S_DARK}\`${S_DARK_OFF}${C_OFF}" "$*"
 }
 format_hyperlink() {
   local text="${1:?"Expected hyperlink text"}"

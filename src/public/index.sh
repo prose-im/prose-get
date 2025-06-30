@@ -202,9 +202,13 @@ ask_yes_no() {
   esac
 }
 
-is_step_skipped() {
+run_step_if_not_skipped() {
   local step="${1:?Expected a step name (with no `step_` prefix)}"
-  [[ " ${PROSE_INSTALL_SKIP_STEPS-} " == *" ${step} "* ]]
+  if [[ " ${PROSE_INSTALL_SKIP_STEPS-} " == *" ${step} "* ]]; then
+    log_warn "Step $(format_code "${step}") skipped. Remove it from $(format_code 'PROSE_INSTALL_SKIP_STEPS') to run the step."
+  else
+    step_"${step}"
+  fi
 }
 
 # Creates directories with the correct owner
@@ -331,7 +335,7 @@ step_checks() {
 
   if (( ${LOG_TRACE:-0} )); then echo; fi
 }
-if ! is_step_skipped checks; then step_checks; fi
+run_step_if_not_skipped checks
 
 
 # === User inputs ===
@@ -375,7 +379,7 @@ step_questions() {
     log_warn "configure it in $(format_path "${PROSE_CONFIG_FILE:?}") in order to send invitations."
   fi
 }
-if ! is_step_skipped questions; then step_questions; fi
+run_step_if_not_skipped questions
 
 
 # === Install Prose ===
@@ -401,7 +405,7 @@ step_create_user_and_group() {
 
   section_end "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") and group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") created (if needed)."
 }
-if ! is_step_skipped create_user_and_group; then step_create_user_and_group; fi
+run_step_if_not_skipped create_user_and_group
 
 step_create_dirs_and_files() {
   section_start 'Creating required files and directories…'
@@ -422,7 +426,7 @@ step_create_dirs_and_files() {
 
   section_end 'Created required files and directories.'
 }
-if ! is_step_skipped create_dirs_and_files; then step_create_dirs_and_files; fi
+run_step_if_not_skipped create_dirs_and_files
 
 step_prose_config() {
   section_start 'Creating the Prose configuration file…'
@@ -474,7 +478,7 @@ step_prose_config() {
 
   section_end "Created the Prose configuration file at $(format_path "${PROSE_CONFIG_FILE:?}")."
 }
-if ! is_step_skipped prose_config; then step_prose_config; fi
+run_step_if_not_skipped prose_config
 
 step_ssl_certificates_prosody() {
   section_start 'Installing SSL certificates for the Server…'
@@ -514,7 +518,7 @@ step_ssl_certificates_prosody() {
     section_end_todo 'SSL certificates for the Server not installed.'
   fi
 }
-if ! is_step_skipped ssl_certificates_prosody; then step_ssl_certificates_prosody; fi
+run_step_if_not_skipped ssl_certificates_prosody
 
 check_docker_compose_installed() {
   command -v docker >/dev/null && docker compose version >/dev/null 2>&1
@@ -535,7 +539,7 @@ step_docker_compose() {
 
   section_end 'Prose is ready to run.'
 }
-if ! is_step_skipped docker_compose; then step_docker_compose; fi
+run_step_if_not_skipped docker_compose
 
 step_run_prose() {
   section_start 'Running Prose…'
@@ -549,7 +553,7 @@ step_run_prose() {
 
   section_end 'Prose is running.'
 }
-if ! is_step_skipped run_prose; then step_run_prose; fi
+run_step_if_not_skipped run_prose
 
 step_reverse_proxy() {
   section_start 'Configuring NGINX to serve Prose web apps…'
@@ -580,7 +584,7 @@ step_reverse_proxy() {
 
   section_end "NGINX is serving $(link_app_web) and $(link_dashboard)."
 }
-if ! is_step_skipped reverse_proxy; then step_reverse_proxy; fi
+run_step_if_not_skipped reverse_proxy
 
 echo
 if [ ${#TODO_LIST[@]} -eq 0 ]; then

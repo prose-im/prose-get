@@ -40,6 +40,8 @@ I_RESET='\033[22m'
 S_UNDERLINE='\033[4m'
 S_UNDERLINE_OFF='\033[24m'
 
+if (( ${DRY_RUN:-0} )); then LOG_TRACE=1; fi
+
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
     printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$*" >&2
@@ -104,7 +106,10 @@ section_end_todo() {
 # ===== Helper functions =====
 
 edo() {
-  bash -c "$*"
+  log_trace "$*"
+  if ! (( ${DRY_RUN:-0} )); then
+    bash -c "$*"
+  fi
   status=$?
   return $status
 }

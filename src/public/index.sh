@@ -532,7 +532,7 @@ step_docker_compose() {
 
   check_docker_compose_installed || install_docker
 
-  usermod -aG docker "${PROSE_USER_NAME:?}"
+  dim edo usermod -aG docker "${PROSE_USER_NAME:?}"
   log_task_success "User $(format_code "${PROSE_USER_NAME:?}") added to group $(format_code docker)."
 
   prose_get_file compose.yaml "${PROSE_COMPOSE_FILE:?}"

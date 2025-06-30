@@ -118,6 +118,38 @@ section_end_todo() {
 
 # ===== Helper functions =====
 
+description() {
+  cat <<EOF
+${I_BOLD}Prose Pod installation script.${I_RESET}
+EOF
+}
+
+usage() {
+  cat <<EOF
+Usage:
+  You want to install the latest released version:
+    curl -L https://get.prose.org | sh
+  You want to run the script with arguments:
+    curl -L https://get.prose.org | sh -s -- [arg...]
+
+Options:
+  Miscellaneous options:
+    --help
+      Explains what the command does and how to use it.
+    --dry-run
+      Do a dry run (i.e. print what would be executed instead of running it).
+    --trace
+      Log tracing messages when running the script.
+EOF
+}
+
+help() {
+  printf "$(description)\n"
+  echo ''
+  printf "$(usage)\n"
+  exit 0
+}
+
 edo() {
   if (( ${DRY_RUN:-0} )); then
     log_dry_run "$*"
@@ -239,6 +271,17 @@ PROSE_FILES=https://raw.githubusercontent.com/prose-im/prose-pod-system/refs/hea
 
 
 # ===== Main logic =====
+
+
+# === Argument parsing ===
+for arg in "$@"; do
+  case $arg in
+    --help) help ;;
+    --dry-run) export DRY_RUN=1 ;;
+    --trace) export LOG_TRACE=1 ;;
+    *) log_error "Unknown argument: $(format_code $arg)."; log_info "$(usage)"; die ;;
+  esac
+done
 
 
 # === Greeting ===

@@ -453,11 +453,11 @@ check_docker_compose_installed() {
   command -v docker >/dev/null && docker compose version >/dev/null 2>&1
 }
 install_docker() {
-  log_info Installing Docker Compose…
+  log_info 'Installing Docker Compose…'
   dim edo curl -s -L https://get.docker.com \| sh
 }
 step_docker_compose() {
-  section_start Installing Prose using Docker Compose…
+  section_start 'Installing Prose using Docker Compose…'
 
   check_docker_compose_installed || install_docker
 
@@ -466,12 +466,12 @@ step_docker_compose() {
 
   prose_get_file compose.yaml "${PROSE_COMPOSE_FILE:?}"
 
-  section_end Prose is ready to run.
+  section_end 'Prose is ready to run.'
 }
 if ! is_step_skipped docker_compose; then step_docker_compose; fi
 
 step_run_prose() {
-  section_start Running Prose…
+  section_start 'Running Prose…'
 
   prose_get_file templates/prose.service /etc/systemd/system/prose.service
   dim edo systemctl daemon-reload
@@ -480,7 +480,7 @@ step_run_prose() {
   dim edo systemctl start prose
   log_task_success "$(format_code systemd) service $(format_code prose) started."
 
-  section_end Prose is running.
+  section_end 'Prose is running.'
 }
 if ! is_step_skipped run_prose; then step_run_prose; fi
 
@@ -511,19 +511,19 @@ step_reverse_proxy() {
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 
-  section_end NGINX is serving $(link_app_web) and $(link_dashboard).
+  section_end "NGINX is serving $(link_app_web) and $(link_dashboard)."
 }
 if ! is_step_skipped reverse_proxy; then step_reverse_proxy; fi
 
 echo
 if [ ${#TODO_LIST[@]} -eq 0 ]; then
-  log_success Installation finished!
-  log_info You can now open $(link_dashboard) and continue setting up your Prose Pod there.
+  log_success 'Installation finished!'
+  log_info "You can now open $(link_dashboard) and continue setting up your Prose Pod there."
 else
-  log_warn Installation is finished, but a few things couldn’t be automated and require manual actions:
+  log_warn 'Installation is finished, but a few things couldn’t be automated and require manual actions:'
   for item in "${TODO_LIST[@]}"; do
     log_warn "- ${item-}"
   done
-  log_info After it’s done, open $(link_dashboard) and continue setting up your Prose Pod there.
+  log_info "After it’s done, open $(link_dashboard) and continue setting up your Prose Pod there."
 fi
-log_info For more information, read $(link_docs_deploy).
+log_info "For more information, read $(link_docs_deploy)."

@@ -261,10 +261,10 @@ link_docs_deploy() {
   format_hyperlink "docs.prose.org/guides/operating/deploy" "https://docs.prose.org/guides/operating/deploy/"
 }
 link_app_web() {
-  format_hyperlink "prose.${APEX_DOMAIN:?}" "https://prose.${APEX_DOMAIN:?}"
+  format_hyperlink "${PROSE_POD_DOMAIN:?}" "https://${PROSE_POD_DOMAIN:?}"
 }
 link_dashboard() {
-  format_hyperlink "admin.prose.${APEX_DOMAIN:?}" "https://admin.prose.${APEX_DOMAIN:?}"
+  format_hyperlink "admin.${PROSE_POD_DOMAIN:?}" "https://admin.${PROSE_POD_DOMAIN:?}"
 }
 
 
@@ -355,7 +355,7 @@ step_questions() {
   read -r APEX_DOMAIN
 
   # Ask desired Prose Pod address.
-  PROSE_POD_DOMAIN_DEFAULT=prose."${APEX_DOMAIN:?}"
+  PROSE_POD_DOMAIN_DEFAULT="prose.${APEX_DOMAIN:?}"
   log_question_inline "Where do you want to host Prose? (${PROSE_POD_DOMAIN_DEFAULT:?})"
   read -r PROSE_POD_DOMAIN
   PROSE_POD_DOMAIN="${PROSE_POD_DOMAIN:-"${PROSE_POD_DOMAIN_DEFAULT:?}"}"
@@ -564,11 +564,11 @@ step_reverse_proxy() {
   section_start 'Configuring NGINX to serve Prose web apps…'
 
   dim edo apt-get -q install -y nginx python3-certbot-nginx
-  edo certbot certonly --nginx -d "prose.${APEX_DOMAIN:?}" -d "admin.prose.${APEX_DOMAIN:?}"
+  edo certbot certonly --nginx -d "${PROSE_POD_DOMAIN:?}" -d "admin.${PROSE_POD_DOMAIN:?}"
 
-  prose_get_file templates/nginx.conf /etc/nginx/sites-available/"prose.${APEX_DOMAIN:?}"
+  prose_get_file templates/nginx.conf /etc/nginx/sites-available/"${PROSE_POD_DOMAIN:?}"
 
-  dim edo ln -s /etc/nginx/sites-{available,enabled}/"prose.${APEX_DOMAIN:?}" >/dev/null
+  dim edo ln -s /etc/nginx/sites-{available,enabled}/"${PROSE_POD_DOMAIN:?}" >/dev/null
 
   dim edo systemctl -q reload nginx
 

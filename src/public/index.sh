@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 
 ##
@@ -12,7 +12,6 @@
 
 
 set -eu
-set -o pipefail
 
 
 # ===== Colors and style =====
@@ -54,46 +53,46 @@ decolor() {
 
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
-    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(decolor <<< "$*")" >&2
+    printf_tty "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
   fi
 }
 log_dry_run() {
-  printf "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(decolor <<< "$*")" >&2
+  printf_tty "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 log_debug() {
-  printf "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
+  printf_tty "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
 }
 log_info() {
-  printf "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
+  printf_tty "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
 }
 log_warn() {
-  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(decolor <<< "$*")" >&2
+  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 log_error() {
-  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(decolor <<< "$*")" >&2
+  printf_tty "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 
 log_success() {
-  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(decolor <<< "$*")"
+  printf_tty "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 log_task_success() {
-  printf "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
 }
 log_task_maybe() {
-  printf "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
 }
 log_task_todo() {
-  printf "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
 }
 log_question() {
-  printf "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
 }
 log_question_inline() {
-  printf "%b %s " "${C_CYAN}?${C_RESET}" "$*"
+  printf_tty "%b %s " "${C_CYAN}?${C_RESET}" "$*"
 }
 
 format_code() {
-  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$(decolor <<< "$*")"
+  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 format_hyperlink() {
   local text="${1:?"Expected hyperlink text"}"
@@ -105,14 +104,14 @@ format_path() {
 }
 
 section_start() {
-  echo
+  echo_tty
   log_trace "$@"
 }
 section_end() {
   log_success "$@"
 }
 section_end_todo() {
-  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
+  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
 }
 
 
@@ -144,10 +143,22 @@ EOF
 }
 
 help() {
-  printf "$(description)\n"
-  echo ''
-  printf "$(usage)\n"
+  printf_tty "$(description)\n"
+  echo_tty ''
+  printf_tty "$(usage)\n"
   exit 0
+}
+
+read_tty() {
+  read "$@" < /dev/tty
+}
+
+printf_tty() {
+  printf "$@" > /dev/tty
+}
+
+echo_tty() {
+  echo "$@" > /dev/tty
 }
 
 # Allows passing a pipe as argument.
@@ -160,7 +171,7 @@ edo() {
   else
     log_trace "$*"
     # NOTE: `$@`, `"$@"` or `eval $@` would break spaces in arguments.
-    eval $(printf '%q ' "$@" | sed "${REGEX_ALLOW_PIPES:?}" | sed -E "${REGEX_ALLOW_REDIRECTS:?}")
+    eval $(printf '%q ' "$@" | sed "${REGEX_ALLOW_PIPES:?}" | sed -E "${REGEX_ALLOW_REDIRECTS:?}") < /dev/tty > /dev/tty
   fi
   status=$?
   return $status
@@ -170,10 +181,10 @@ dim() {
   # NOTE: Do not dim in dry runs because commands will not be ran (thus output)
   #   anyway. They will be logged as traces and colors would be incorrect in
   #   this case (for the log line).
-  (( ${DRY_RUN:-0} )) || printf "${I_DIM}"
+  (( ${DRY_RUN:-0} )) || printf_tty "${I_DIM}"
   "$@"
   status=$?
-  (( ${DRY_RUN:-0} )) || printf "${I_RESET}"
+  (( ${DRY_RUN:-0} )) || printf_tty "${I_RESET}"
   return $status
 }
 
@@ -185,9 +196,9 @@ ask_yes_no() {
 
   choices() {
     case "$yes_no_default" in
-      y|Y) echo 'Y|n' ;;
-      n|N) echo 'y|N' ;;
-      *) echo 'y|n' ;;
+      y|Y) printf '%s' 'Y|n' ;;
+      n|N) printf '%s' 'y|N' ;;
+      *) printf '%s' 'y|n' ;;
     esac
   }
 
@@ -199,8 +210,8 @@ ask_yes_no() {
   #   will be empty. `echo` will print the value the user entered if
   #   any, plus a trailing `\n` which looks exactly like if we hadn’t
   #   used `-s` in the first place.
-  read -n 1 -s answer
-  echo "${answer}"
+  read_tty -n 1 -s answer
+  echo_tty "${answer}"
   case "${answer:-"$yes_no_default"}" in
     y|Y) return 0 ;;
     n|N|*) return 1 ;;
@@ -268,6 +279,52 @@ link_dashboard() {
 }
 
 
+# === POSIX-compliant fake arrays ===
+
+# POSIX shells don’t have arrays, therefore we have to craft them ourselves.
+# The trick is to create a long string with a custom separator, then split on
+# it later for iteration.
+# NOTE: I (RemiBardon) wish I could just use Bash arrays…
+
+# Use ASCII Unit Separator (`0x1F`) as separator because it is very unlikely
+# to appear in normal strings.
+ARRAY_SEP="$(printf '\037')"
+
+# Adds a string to a “pseudo-array” string.
+# Usage: `result=$(posix_array_push "$existing_array" "new_item")`.
+posix_array_push() {
+  existing_array="${1-}"
+  new_item="${2:?}"
+
+  if [ -z "${existing_array-}" ]; then
+    # First item: no separator needed.
+    printf '%s' "${new_item-}"
+  else
+    # Append with separator.
+    printf '%s%s%s' "${existing_array:?}" "${ARRAY_SEP:?}" "${new_item-}"
+  fi
+}
+
+# Splits a “pseudo-array” string for use in `for` loops.
+# Usage: `posix_array_split "$array_string" | while read -r item; do ... done`.
+# See tests in <https://gist.github.com/RemiBardon/c7b9db54dca1c7e8d819b4f9267b9991>.
+posix_array_split() {
+  array_string="$1"
+
+  if [ -z "${array_string-}" ]; then
+    return 0
+  fi
+
+  # Use parameter expansion to replace `$ARRAY_SEP` by `\n`.
+  # This creates one item per line, preserving spaces within items.
+  # NOTE: We can’t just use `IFS=$ARRAY_SEP printf` because `printf`
+  #   is a builtin and do not get the special treatment `read` does.
+  oldIFS=$IFS IFS="${ARRAY_SEP:?}"
+  printf '%s\n' ${array_string:?}
+  IFS=$oldIFS
+}
+
+
 # ===== Constants =====
 
 PROSE_USER_NAME=prose
@@ -297,12 +354,12 @@ done
 
 # Welcome message
 log_info "Hello and welcome to the $(format_hyperlink "Prose" "https://prose.org/") installer script."
-echo
+echo_tty
 
 # Dry run warning
 if (( ${DRY_RUN:-0} )); then
   log_warn 'Dry run is enabled, actions will be logged instead of being performed.'
-  echo
+  echo_tty
 fi
 
 
@@ -338,7 +395,7 @@ step_checks() {
     die
   fi
 
-  if (( ${LOG_TRACE:-0} )); then echo; fi
+  if (( ${LOG_TRACE:-0} )); then echo_tty; fi
 }
 run_step_if_not_skipped checks
 
@@ -348,35 +405,35 @@ run_step_if_not_skipped checks
 step_questions() {
   # Ask company name.
   log_question_inline 'What is the name of your company?'
-  read -r COMPANY_NAME
+  read_tty -r COMPANY_NAME
 
   # Ask company apex domain.
   log_question_inline 'What is your apex domain?'
-  read -r APEX_DOMAIN
+  read_tty -r APEX_DOMAIN
 
   # Ask desired Prose Pod address.
   PROSE_POD_DOMAIN_DEFAULT="prose.${APEX_DOMAIN:?}"
   log_question_inline "Where do you want to host Prose? (${PROSE_POD_DOMAIN_DEFAULT:?})"
-  read -r PROSE_POD_DOMAIN
+  read_tty -r PROSE_POD_DOMAIN
   PROSE_POD_DOMAIN="${PROSE_POD_DOMAIN:-"${PROSE_POD_DOMAIN_DEFAULT:?}"}"
 
   # Ask SMTP server info.
   if ask_yes_no 'Do you have a SMTP server Prose could use (e.g. to send invitations)?' y; then
     log_question_inline "  - SMTP host: (${APEX_DOMAIN:?})"
-    read -r SMTP_HOST
+    read_tty -r SMTP_HOST
     SMTP_HOST="${SMTP_HOST:-"${APEX_DOMAIN:?}"}"
 
     SMTP_PORT_DEFAULT=587
     log_question_inline "  - SMTP port: (${SMTP_PORT_DEFAULT:?})"
-    read -r SMTP_PORT
+    read_tty -r SMTP_PORT
     SMTP_PORT="${SMTP_PORT:-"${SMTP_PORT_DEFAULT:?}"}"
 
     log_question_inline '  - SMTP username:'
-    read -r SMTP_USER
+    read_tty -r SMTP_USER
 
     log_question_inline '  - SMTP password:'
-    read -r -s SMTP_PASS
-    echo # Print empty line because `read -s` doesn’t.
+    read_tty -r -s SMTP_PASS
+    echo_tty # Print empty line because `read -s` doesn’t.
 
     ask_yes_no '  - Force SMTP encryption?' y && SMTP_ENCRYPT=true || SMTP_ENCRYPT=false
   else
@@ -389,7 +446,7 @@ run_step_if_not_skipped questions
 
 # === Install Prose ===
 
-TODO_LIST=()
+TODO_LIST=""
 
 step_create_user_and_group() {
   section_start "Creating the user and group…"
@@ -438,24 +495,22 @@ step_prose_config() {
 
   # Get the template.
   prose_get_file templates/prose-scripting.toml "${PROSE_CONFIG_FILE:?}"
-  local replacements
-  replacements=()
 
   # Fill the file with answers from the user.
   if [ -n "${SMTP_HOST-}" ]; then
     set_config() {
       local key="${1:?Expected a config name}"
       local value="${2:?Expected a value}"
-      replacements+=(-e "s~\{${key}\}~${value}~g")
+      dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
     }
 
     set_config_opt() {
       local key="${1:?Expected a config name}"
       local value="${2?Expected a value}"
       if [ -n "${value-}" ]; then
-        replacements+=(-e "s~\{${key}\}~${value}~g")
+        dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
       else
-        replacements+=(-e 's~^(.*\{'"${key}"'\}.*)$~#\1~g')
+        dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
       fi
     }
 
@@ -473,13 +528,9 @@ step_prose_config() {
 
     set_config_opt smtp_encrypt "${SMTP_ENCRYPT-}"
   else
-    replacements+=( \
-      -e 's/^(smtp_\w+ =)/#\1/g' \
-      -e 's/(\[notifiers.email\])/#\1/' \
-    )
+    dim edo sed -i -E -e 's/^(smtp_\w+ =)/#\1/g' "${PROSE_CONFIG_FILE:?}"
+    dim edo sed -i -E -e 's/(\[notifiers.email\])/#\1/' "${PROSE_CONFIG_FILE:?}"
   fi
-
-  dim edo sed -i -E "${replacements[@]}" "${PROSE_CONFIG_FILE:?}"
 
   section_end "Created the Prose configuration file at $(format_path "${PROSE_CONFIG_FILE:?}")."
 }
@@ -505,7 +556,7 @@ step_ssl_certificates_prosody() {
       if grep -q 'prosody/certs' "${cert_renewal_conf_file:?}"; then
         log_task_maybe "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Assuming it’s correct."
       else
-        TODO_LIST+=("Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")
+        TODO_LIST="$(posix_array_push "${TODO_LIST-}" "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")"
         log_task_todo "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Manual action required."
       fi
     else
@@ -514,10 +565,8 @@ step_ssl_certificates_prosody() {
 
     section_end 'Installed SSL certificates for the Server.'
   else
-    TODO_LIST+=( \
-      "Generate certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") then put them in $(format_path "/etc/letsencrypt/live/${APEX_DOMAIN:?}")." \
-      "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}")." \
-    )
+    TODO_LIST="$(posix_array_push "${TODO_LIST-}" "Generate certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") then put them in $(format_path "/etc/letsencrypt/live/${APEX_DOMAIN:?}").")"
+    TODO_LIST="$(posix_array_push "${TODO_LIST-}" "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")"
     log_task_todo "Certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") not generated. Manual action required."
 
     section_end_todo 'SSL certificates for the Server not installed.'
@@ -591,13 +640,13 @@ step_reverse_proxy() {
 }
 run_step_if_not_skipped reverse_proxy
 
-echo
-if [ ${#TODO_LIST[@]} -eq 0 ]; then
+echo_tty
+if [ -z "${TODO_LIST-}" ]; then
   log_success 'Installation finished!'
   log_info "You can now open $(link_dashboard) and continue setting up your Prose Pod there."
 else
   log_warn 'Installation is finished, but a few things couldn’t be automated and require manual actions:'
-  for item in "${TODO_LIST[@]}"; do
+  posix_array_split "${TODO_LIST:?}" | while read -r item; do
     log_warn "- ${item-}"
   done
   log_info "After it’s done, open $(link_dashboard) and continue setting up your Prose Pod there."

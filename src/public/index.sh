@@ -279,6 +279,52 @@ link_dashboard() {
 }
 
 
+# === POSIX-compliant fake arrays ===
+
+# POSIX shells don’t have arrays, therefore we have to craft them ourselves.
+# The trick is to create a long string with a custom separator, then split on
+# it later for iteration.
+# NOTE: I (RemiBardon) wish I could just use Bash arrays…
+
+# Use ASCII Unit Separator (`0x1F`) as separator because it is very unlikely
+# to appear in normal strings.
+ARRAY_SEP="$(printf '\037')"
+
+# Adds a string to a “pseudo-array” string.
+# Usage: `result=$(posix_array_push "$existing_array" "new_item")`.
+posix_array_push() {
+  existing_array="${1-}"
+  new_item="${2:?}"
+
+  if [ -z "${existing_array-}" ]; then
+    # First item: no separator needed.
+    printf '%s' "${new_item-}"
+  else
+    # Append with separator.
+    printf '%s%s%s' "${existing_array:?}" "${ARRAY_SEP:?}" "${new_item-}"
+  fi
+}
+
+# Splits a “pseudo-array” string for use in `for` loops.
+# Usage: `posix_array_split "$array_string" | while read -r item; do ... done`.
+# See tests in <https://gist.github.com/RemiBardon/c7b9db54dca1c7e8d819b4f9267b9991>.
+posix_array_split() {
+  array_string="$1"
+
+  if [ -z "${array_string-}" ]; then
+    return 0
+  fi
+
+  # Use parameter expansion to replace `$ARRAY_SEP` by `\n`.
+  # This creates one item per line, preserving spaces within items.
+  # NOTE: We can’t just use `IFS=$ARRAY_SEP printf` because `printf`
+  #   is a builtin and do not get the special treatment `read` does.
+  oldIFS=$IFS IFS="${ARRAY_SEP:?}"
+  printf '%s\n' ${array_string:?}
+  IFS=$oldIFS
+}
+
+
 # ===== Constants =====
 
 PROSE_USER_NAME=prose
@@ -400,7 +446,7 @@ run_step_if_not_skipped questions
 
 # === Install Prose ===
 
-TODO_LIST=()
+TODO_LIST=""
 
 step_create_user_and_group() {
   section_start "Creating the user and group…"
@@ -449,24 +495,22 @@ step_prose_config() {
 
   # Get the template.
   prose_get_file templates/prose-scripting.toml "${PROSE_CONFIG_FILE:?}"
-  local replacements
-  replacements=()
 
   # Fill the file with answers from the user.
   if [ -n "${SMTP_HOST-}" ]; then
     set_config() {
       local key="${1:?Expected a config name}"
       local value="${2:?Expected a value}"
-      replacements+=(-e "s~\{${key}\}~${value}~g")
+      dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
     }
 
     set_config_opt() {
       local key="${1:?Expected a config name}"
       local value="${2?Expected a value}"
       if [ -n "${value-}" ]; then
-        replacements+=(-e "s~\{${key}\}~${value}~g")
+        dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
       else
-        replacements+=(-e 's~^(.*\{'"${key}"'\}.*)$~#\1~g')
+        dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
       fi
     }
 
@@ -484,13 +528,9 @@ step_prose_config() {
 
     set_config_opt smtp_encrypt "${SMTP_ENCRYPT-}"
   else
-    replacements+=( \
-      -e 's/^(smtp_\w+ =)/#\1/g' \
-      -e 's/(\[notifiers.email\])/#\1/' \
-    )
+    dim edo sed -i -E -e 's/^(smtp_\w+ =)/#\1/g' "${PROSE_CONFIG_FILE:?}"
+    dim edo sed -i -E -e 's/(\[notifiers.email\])/#\1/' "${PROSE_CONFIG_FILE:?}"
   fi
-
-  dim edo sed -i -E "${replacements[@]}" "${PROSE_CONFIG_FILE:?}"
 
   section_end "Created the Prose configuration file at $(format_path "${PROSE_CONFIG_FILE:?}")."
 }
@@ -516,7 +556,7 @@ step_ssl_certificates_prosody() {
       if grep -q 'prosody/certs' "${cert_renewal_conf_file:?}"; then
         log_task_maybe "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Assuming it’s correct."
       else
-        TODO_LIST+=("Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")
+        TODO_LIST="$(posix_array_push "${TODO_LIST-}" "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")"
         log_task_todo "$(format_code post_hook) already configured in $(format_path "${cert_renewal_conf_file:?}"). Manual action required."
       fi
     else
@@ -525,10 +565,8 @@ step_ssl_certificates_prosody() {
 
     section_end 'Installed SSL certificates for the Server.'
   else
-    TODO_LIST+=( \
-      "Generate certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") then put them in $(format_path "/etc/letsencrypt/live/${APEX_DOMAIN:?}")." \
-      "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}")." \
-    )
+    TODO_LIST="$(posix_array_push "${TODO_LIST-}" "Generate certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") then put them in $(format_path "/etc/letsencrypt/live/${APEX_DOMAIN:?}").")"
+    TODO_LIST="$(posix_array_push "${TODO_LIST-}" "Add $(format_code "${post_hook}") to your $(format_code post_hook) in $(format_path "${cert_renewal_conf_file:?}").")"
     log_task_todo "Certificates for $(format_code "${APEX_DOMAIN:?}") and $(format_code "groups.${APEX_DOMAIN:?}") not generated. Manual action required."
 
     section_end_todo 'SSL certificates for the Server not installed.'
@@ -603,12 +641,12 @@ step_reverse_proxy() {
 run_step_if_not_skipped reverse_proxy
 
 echo_tty
-if [ ${#TODO_LIST[@]} -eq 0 ]; then
+if [ -z "${TODO_LIST-}" ]; then
   log_success 'Installation finished!'
   log_info "You can now open $(link_dashboard) and continue setting up your Prose Pod there."
 else
   log_warn 'Installation is finished, but a few things couldn’t be automated and require manual actions:'
-  for item in "${TODO_LIST[@]}"; do
+  posix_array_split "${TODO_LIST:?}" | while read -r item; do
     log_warn "- ${item-}"
   done
   log_info "After it’s done, open $(link_dashboard) and continue setting up your Prose Pod there."

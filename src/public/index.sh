@@ -12,7 +12,6 @@
 
 
 set -eu
-set -o pipefail
 
 
 # ===== Colors and style =====

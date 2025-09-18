@@ -54,42 +54,42 @@ decolor() {
 
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
-    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
+    printf_tty "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
   fi
 }
 log_dry_run() {
-  printf "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
+  printf_tty "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 log_debug() {
-  printf "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
+  printf_tty "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
 }
 log_info() {
-  printf "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
+  printf_tty "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
 }
 log_warn() {
-  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
+  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 log_error() {
-  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
+  printf_tty "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 
 log_success() {
-  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(printf "%s" "$*" | decolor)"
+  printf_tty "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 log_task_success() {
-  printf "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
 }
 log_task_maybe() {
-  printf "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
 }
 log_task_todo() {
-  printf "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
 }
 log_question() {
-  printf "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
 }
 log_question_inline() {
-  printf "%b %s " "${C_CYAN}?${C_RESET}" "$*"
+  printf_tty "%b %s " "${C_CYAN}?${C_RESET}" "$*"
 }
 
 format_code() {
@@ -105,14 +105,14 @@ format_path() {
 }
 
 section_start() {
-  echo
+  echo_tty
   log_trace "$@"
 }
 section_end() {
   log_success "$@"
 }
 section_end_todo() {
-  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
+  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
 }
 
 
@@ -144,10 +144,22 @@ EOF
 }
 
 help() {
-  printf "$(description)\n"
-  echo ''
-  printf "$(usage)\n"
+  printf_tty "$(description)\n"
+  echo_tty ''
+  printf_tty "$(usage)\n"
   exit 0
+}
+
+read_tty() {
+  read "$@" < /dev/tty
+}
+
+printf_tty() {
+  printf "$@" > /dev/tty
+}
+
+echo_tty() {
+  echo "$@" > /dev/tty
 }
 
 # Allows passing a pipe as argument.
@@ -170,10 +182,10 @@ dim() {
   # NOTE: Do not dim in dry runs because commands will not be ran (thus output)
   #   anyway. They will be logged as traces and colors would be incorrect in
   #   this case (for the log line).
-  (( ${DRY_RUN:-0} )) || printf "${I_DIM}"
+  (( ${DRY_RUN:-0} )) || printf_tty "${I_DIM}"
   "$@"
   status=$?
-  (( ${DRY_RUN:-0} )) || printf "${I_RESET}"
+  (( ${DRY_RUN:-0} )) || printf_tty "${I_RESET}"
   return $status
 }
 
@@ -185,9 +197,9 @@ ask_yes_no() {
 
   choices() {
     case "$yes_no_default" in
-      y|Y) echo 'Y|n' ;;
-      n|N) echo 'y|N' ;;
-      *) echo 'y|n' ;;
+      y|Y) printf '%s' 'Y|n' ;;
+      n|N) printf '%s' 'y|N' ;;
+      *) printf '%s' 'y|n' ;;
     esac
   }
 
@@ -199,8 +211,8 @@ ask_yes_no() {
   #   will be empty. `echo` will print the value the user entered if
   #   any, plus a trailing `\n` which looks exactly like if we hadn’t
   #   used `-s` in the first place.
-  read -n 1 -s answer
-  echo "${answer}"
+  read_tty -n 1 -s answer
+  echo_tty "${answer}"
   case "${answer:-"$yes_no_default"}" in
     y|Y) return 0 ;;
     n|N|*) return 1 ;;
@@ -297,12 +309,12 @@ done
 
 # Welcome message
 log_info "Hello and welcome to the $(format_hyperlink "Prose" "https://prose.org/") installer script."
-echo
+echo_tty
 
 # Dry run warning
 if (( ${DRY_RUN:-0} )); then
   log_warn 'Dry run is enabled, actions will be logged instead of being performed.'
-  echo
+  echo_tty
 fi
 
 
@@ -338,7 +350,7 @@ step_checks() {
     die
   fi
 
-  if (( ${LOG_TRACE:-0} )); then echo; fi
+  if (( ${LOG_TRACE:-0} )); then echo_tty; fi
 }
 run_step_if_not_skipped checks
 
@@ -348,35 +360,35 @@ run_step_if_not_skipped checks
 step_questions() {
   # Ask company name.
   log_question_inline 'What is the name of your company?'
-  read -r COMPANY_NAME
+  read_tty -r COMPANY_NAME
 
   # Ask company apex domain.
   log_question_inline 'What is your apex domain?'
-  read -r APEX_DOMAIN
+  read_tty -r APEX_DOMAIN
 
   # Ask desired Prose Pod address.
   PROSE_POD_DOMAIN_DEFAULT="prose.${APEX_DOMAIN:?}"
   log_question_inline "Where do you want to host Prose? (${PROSE_POD_DOMAIN_DEFAULT:?})"
-  read -r PROSE_POD_DOMAIN
+  read_tty -r PROSE_POD_DOMAIN
   PROSE_POD_DOMAIN="${PROSE_POD_DOMAIN:-"${PROSE_POD_DOMAIN_DEFAULT:?}"}"
 
   # Ask SMTP server info.
   if ask_yes_no 'Do you have a SMTP server Prose could use (e.g. to send invitations)?' y; then
     log_question_inline "  - SMTP host: (${APEX_DOMAIN:?})"
-    read -r SMTP_HOST
+    read_tty -r SMTP_HOST
     SMTP_HOST="${SMTP_HOST:-"${APEX_DOMAIN:?}"}"
 
     SMTP_PORT_DEFAULT=587
     log_question_inline "  - SMTP port: (${SMTP_PORT_DEFAULT:?})"
-    read -r SMTP_PORT
+    read_tty -r SMTP_PORT
     SMTP_PORT="${SMTP_PORT:-"${SMTP_PORT_DEFAULT:?}"}"
 
     log_question_inline '  - SMTP username:'
-    read -r SMTP_USER
+    read_tty -r SMTP_USER
 
     log_question_inline '  - SMTP password:'
-    read -r -s SMTP_PASS
-    echo # Print empty line because `read -s` doesn’t.
+    read_tty -r -s SMTP_PASS
+    echo_tty # Print empty line because `read -s` doesn’t.
 
     ask_yes_no '  - Force SMTP encryption?' y && SMTP_ENCRYPT=true || SMTP_ENCRYPT=false
   else
@@ -591,7 +603,7 @@ step_reverse_proxy() {
 }
 run_step_if_not_skipped reverse_proxy
 
-echo
+echo_tty
 if [ ${#TODO_LIST[@]} -eq 0 ]; then
   log_success 'Installation finished!'
   log_info "You can now open $(link_dashboard) and continue setting up your Prose Pod there."

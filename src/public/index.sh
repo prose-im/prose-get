@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 
 ##
@@ -54,11 +54,11 @@ decolor() {
 
 log_trace() {
   if (( ${LOG_TRACE:-0} )); then
-    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(decolor <<< "$*")" >&2
+    printf "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
   fi
 }
 log_dry_run() {
-  printf "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(decolor <<< "$*")" >&2
+  printf "${I_DIM}%b %s${I_RESET}\n" "${C_YELLOW}dry_run:${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 log_debug() {
   printf "%b %s\n" "${C_YELLOW}D${C_RESET}" "$*" >&2
@@ -67,14 +67,14 @@ log_info() {
   printf "${I_BOLD}%b %s${I_RESET}\n" "${C_BLUE}i${C_RESET}" "$*"
 }
 log_warn() {
-  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(decolor <<< "$*")" >&2
+  printf "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}W${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 log_error() {
-  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(decolor <<< "$*")" >&2
+  printf "${I_BOLD}%b ${C_RED}%s${C_RESET}${I_RESET}\n" "${C_RED}E${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
 }
 
 log_success() {
-  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(decolor <<< "$*")"
+  printf "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 log_task_success() {
   printf "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
@@ -93,7 +93,7 @@ log_question_inline() {
 }
 
 format_code() {
-  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$(decolor <<< "$*")"
+  printf "${C_CYAN}${I_DIM}\`${I_RESET}%s${I_DIM}\`${I_RESET}${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 format_hyperlink() {
   local text="${1:?"Expected hyperlink text"}"

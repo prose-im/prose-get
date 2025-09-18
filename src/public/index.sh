@@ -171,7 +171,7 @@ edo() {
   else
     log_trace "$*"
     # NOTE: `$@`, `"$@"` or `eval $@` would break spaces in arguments.
-    eval $(printf '%q ' "$@" | sed "${REGEX_ALLOW_PIPES:?}" | sed -E "${REGEX_ALLOW_REDIRECTS:?}")
+    eval $(printf '%q ' "$@" | sed "${REGEX_ALLOW_PIPES:?}" | sed -E "${REGEX_ALLOW_REDIRECTS:?}") < /dev/tty > /dev/tty
   fi
   status=$?
   return $status

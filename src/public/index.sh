@@ -373,7 +373,7 @@ step_checks() {
   esac
 
   log_trace "Checking if user is $(format_code root)…"
-  if [ "$EUID" -ne 0 ]; then
+  if [ "$(id -u)" -ne 0 ]; then
     log_error "This script must be ran as root."
     log_contact_assistance
     die

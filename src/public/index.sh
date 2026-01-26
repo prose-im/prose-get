@@ -1,13 +1,12 @@
-#!/bin/sh
-
+#!/usr/bin/env sh
 
 ##
-#  Prose Pod installation script
+# Prose Pod installation script
 #
-#  /!\ This script should be ran from your server to setup your own Prose Pod, \
-#      with this command: `curl -L https://get.prose.org | sh`
+# /!\ This script should be ran from your server to setup your own Prose Pod, \
+#     with this command: `curl -L https://get.prose.org | sh`
 #
-#  Copyright 2025, Prose Foundation
+# Copyright 2025–2026, Prose Foundation
 ##
 
 
@@ -52,7 +51,7 @@ decolor() {
 }
 
 log_trace() {
-  if (( ${LOG_TRACE:-0} )); then
+  if [ "${LOG_TRACE:-0}" -ne 0 ]; then
     printf_tty "%b ${I_DIM}%s${I_RESET}\n" "${C_PURPLE}T${C_RESET}" "$(printf "%s" "$*" | decolor)" >&2
   fi
 }
@@ -166,7 +165,7 @@ REGEX_ALLOW_PIPES='s#\\|#|#'
 # Allows passing redirects (e.g. `2>&1`) as argument.
 REGEX_ALLOW_REDIRECTS='s#([[:digit:]]*)\\>(\\&[[:digit:]]+)?#\1>\2#'
 edo() {
-  if (( ${DRY_RUN:-0} )); then
+  if [ "${DRY_RUN:-0}" -ne 0 ]; then
     log_dry_run "$*"
   else
     log_trace "$*"
@@ -181,10 +180,10 @@ dim() {
   # NOTE: Do not dim in dry runs because commands will not be ran (thus output)
   #   anyway. They will be logged as traces and colors would be incorrect in
   #   this case (for the log line).
-  (( ${DRY_RUN:-0} )) || printf_tty "${I_DIM}"
+  [ "${DRY_RUN:-0}" -ne 0 ] || printf_tty "${I_DIM}"
   "$@"
   status=$?
-  (( ${DRY_RUN:-0} )) || printf_tty "${I_RESET}"
+  [ "${DRY_RUN:-0}" -ne 0 ] || printf_tty "${I_RESET}"
   return $status
 }
 
@@ -220,11 +219,12 @@ ask_yes_no() {
 
 run_step_if_not_skipped() {
   local step="${1:?Expected a step name (with no `step_` prefix)}"
-  if [[ " ${PROSE_INSTALL_SKIP_STEPS-} " == *" ${step} "* ]]; then
-    log_warn "Step $(format_code "${step}") skipped. Remove it from $(format_code 'PROSE_INSTALL_SKIP_STEPS') to run the step."
-  else
-    step_"${step}"
-  fi
+  case " ${PROSE_INSTALL_SKIP_STEPS-} " in
+    *" ${step} "*)
+      log_warn "Step $(format_code "${step}") skipped. Remove it from $(format_code 'PROSE_INSTALL_SKIP_STEPS') to run the step."
+      ;;
+    *) step_"${step}" ;;
+  esac
 }
 
 # Creates directories with the correct owner
@@ -357,7 +357,7 @@ log_info "Hello and welcome to the $(format_hyperlink "Prose" "https://prose.org
 echo_tty
 
 # Dry run warning
-if (( ${DRY_RUN:-0} )); then
+if [ "${DRY_RUN:-0}" -ne 0 ]; then
   log_warn 'Dry run is enabled, actions will be logged instead of being performed.'
   echo_tty
 fi
@@ -373,7 +373,7 @@ step_checks() {
   esac
 
   log_trace "Checking if user is $(format_code root)…"
-  if [ "$EUID" -ne 0 ]; then
+  if [ "$(id -u)" -ne 0 ]; then
     log_error "This script must be ran as root."
     log_contact_assistance
     die
@@ -395,7 +395,7 @@ step_checks() {
     die
   fi
 
-  if (( ${LOG_TRACE:-0} )); then echo_tty; fi
+  if [ "${LOG_TRACE:-0}" -ne 0 ]; then echo_tty; fi
 }
 run_step_if_not_skipped checks
 

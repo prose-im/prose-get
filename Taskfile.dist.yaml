@@ -1,0 +1,82 @@
+# See <https://taskfile.dev/usage> and <https://taskfile.dev/reference/schema>
+# to find all keys and their usage.
+version: "3"
+
+silent: false
+dotenv: ["local.env"]
+
+# includes:
+#   system:
+#     taskfile: ${PROSE_POD_SYSTEM_DIR:?Clone prose-pod-system and set PROSE_POD_SYSTEM_DIR to its relative path. You can use local.env which will be sourced automatically.}/Taskfile.dist.yaml
+#     dir: ${PROSE_POD_SYSTEM_DIR:?}
+#     excludes: [update, release]
+#     # NOTE: `dotenv` and `env` are interpreted _after_ `includes`, which means
+#     #   we can’t just source a `.env` file to read `PROSE_POD_SYSTEM_DIR`.
+#     #   To avoid completely blocking the use of this taskfile, let’s just
+#     #   make it optional and perform a precondition check in tasks that require
+#     #   `prose-pod-system` tasks.
+#     optional: true
+
+tasks:
+  test:
+    desc: Run all tests
+    cmds:
+      - sh -n src/public/index.sh
+      - dash -n src/public/index.sh
+      # NOTE: For some reason, `! grep -E …` doesn’t work as expected in Task.
+      - grep -En '\(\(|\[\[[^:]' --colour src/public/index.sh && exit 1 || exit 0
+      - echo TODO; exit 42
+
+  integration-test:
+    desc: Run all integration tests
+    cmds:
+      # Test IP combinations.
+      - for:
+          - --ipv4
+          - --ipv4 --ipv6
+          - --ipv6
+        task: integration-test:hetzner
+        vars:
+          TYPE: cax11
+          IMAGE: debian-13
+          CLI_ARGS: "{{ .ITEM }} {{ .CLI_ARGS }}"
+      # Test mutliple operating systems.
+      # NOTE: See all using `hcloud image list -t system --sort name`.
+      - for:
+          - debian-11
+          - debian-13
+          - fedora-43
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - centos-stream-10
+        task: integration-test:hetzner
+        vars:
+          TYPE: cax11
+          IMAGE: "{{ .ITEM }}"
+      # Test mutliple architectures.
+      # NOTE: See all using `hcloud server-type list`.
+      - for:
+          - cax11 # arm
+          - cx23 # x86
+        task: integration-test:hetzner
+        vars:
+          TYPE: "{{ .ITEM }}"
+          IMAGE: debian-13
+      # Non-regression tests.
+      # Add specific cases here if we detect an isolated failing tuple.
+
+  integration-test:hetzner:
+    desc: Run integration tests on Hetzner (hetzner.com)
+    dotenv: ["test.env"]
+    cmd: >-
+      ./scripts/integration-test-hetzner
+      {{ if .TYPE }}--type={{ .TYPE }}{{ end }}
+      {{ if .IMAGE }}--image={{ .IMAGE }}{{ end }}
+      {{ if .LOCATION }}--location={{ .LOCATION }}{{ end }}
+      {{ .CLI_ARGS }}
+    # preconditions:
+    #   - sh: >-
+    #       [[ " $(task -a | sed -n 's/^\* \([^[:space:]]*\):.*/\1/p' | tr '\n' ' ') " == *' system:'* ]]
+    #     msg: >-
+    #       Clone prose-pod-system and set PROSE_POD_SYSTEM_DIR to its relative path.
+    #       You can use local.env which will be sourced automatically.

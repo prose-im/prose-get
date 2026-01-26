@@ -1,4 +1,7 @@
-# Editor
+# Environment files
+*.env
+
+# Editors
 .nova
 
 # macOS

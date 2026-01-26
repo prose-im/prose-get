@@ -1,0 +1,341 @@
+#!/usr/bin/env bash
+
+##
+# This file is part of prose-get
+#
+# Copyright 2026, Prose Foundation
+# SPDX-License-Identifier: MPL-2.0
+#
+# Authors:
+# - 2026, Rémi Bardon <remi@remibardon.name>
+##
+
+# TODO:
+# - Create a one time SSH key to avoid using the dev’s key (removes the need
+#   for card taps if SSH key derived from GPG key on smart card).
+
+set -eu
+
+
+# ===== UTILITIES =====
+
+: ${SCRIPTS_DIR:="$(dirname $0)"}
+: ${BASH_TOOLBOX:="${SCRIPTS_DIR:?}"/bash-toolbox}
+for util in die edo format log yes-no; do
+  source "${BASH_TOOLBOX:?}/${util:?}.sh"
+done
+
+if [ -z "${PROSE_POD_SYSTEM_DIR-}" ]; then
+  die "Clone $(format_hyperlink prose-pod-system https://github.com/prose-im/prose-pod-system) and set $(format_code PROSE_POD_SYSTEM_DIR) to its relative path. You can use $(format_code local.env) which will be sourced automatically."
+fi
+
+source "${PROSE_POD_SYSTEM_DIR:?}"/scripts/hetzner/prelude.sh
+
+
+# ===== ARGUMENT PARSING =====
+
+# === Default values ===
+
+# NOTE: See all using `hcloud datacenter list`.
+# HETZNER_LOCATION=fsn1 # nbg1
+
+# NOTE: See all using `hcloud server-type list`.
+HETZNER_TYPE=cx23 # cax11
+
+# NOTE: See all using `hcloud image list -t system --sort name`.
+HETZNER_IMAGE=debian-13
+
+# === Argument parsing ===
+
+for arg in "$@"; do
+  case $arg in
+    --location=*) HETZNER_LOCATION="${arg#'--location='}" ;;
+    --type=*) HETZNER_TYPE="${arg#'--type='}" ;;
+    --image=*) HETZNER_IMAGE="${arg#'--image='}" ;;
+    --name=*) SERVER_NAME="${arg#'--name='}" ;;
+    --ipv4) WITH_IPV4=1 ;;
+    --ipv6) WITH_IPV6=1 ;;
+    --force) FORCE=1 ;;
+    --help) help ;;
+    --dry-run) export DRY_RUN=1 ;;
+    --debug) export LOG_LEVEL=debug ;;
+    --trace) export LOG_LEVEL=trace ;;
+    *) error "Unknown argument: $(format_code $arg)."; info "$(usage)"; die ;;
+  esac
+done
+
+# === Input validation ===
+
+if ! (( ${WITH_IPV4:-0} || ${WITH_IPV6:-0} )); then
+  info "Neither of $(format_code '--ipv4') nor $(format_code '--ipv6') was passed; defaulting to cheaper IPv6."
+  WITH_IPV6=1
+fi
+
+if [ -z "${HETZNER_TYPE-}" ]; then
+  die "$(format_code '--type=<type>') is required. See all using $(format_code 'hcloud server-type list')."
+fi
+
+if [ -z "${HETZNER_IMAGE-}" ]; then
+  die "$(format_code '--image=<image>') is required. See all using $(format_code 'hcloud image list -t system --sort name')."
+fi
+
+# === Apply dynamic default values ===
+
+# : ${SERVER_NAME:="prose-get-test-hetzner-${HETZNER_TYPE:?}-${HETZNER_IMAGE:?}-$(date +%s)"}
+: ${SERVER_NAME:="prose-get-test-hetzner-${HETZNER_TYPE:?}-${HETZNER_IMAGE:?}"}
+
+
+# ===== SETUP =====
+
+info 'Setting up local Hetzner environment…'
+ENV_FILE=test.env hetzner_setup prose-get-test
+
+info 'Creating Hetzner server…'
+(
+  SSH_KEY="${HETZNER_SSH_KEY:?}"
+  WITH_IPV4="${WITH_IPV4-}"
+  WITH_IPV6="${WITH_IPV6-}"
+  LOCATION="${HETZNER_LOCATION-}"
+  hetzner_server_create "${SERVER_NAME:?}" "${HETZNER_TYPE:?}" "${HETZNER_IMAGE:?}"
+)
+success 'Server created.'
+
+cleanup_hetzner() {
+  debug cleanup_hetzner
+
+  info 'Deleting server…'
+  hetzner_server_delete "${SERVER_NAME:?}"
+  success 'Server deleted.'
+}
+trap cleanup_hetzner EXIT
+
+if (( ${DRY_RUN:-0} )); then
+  SERVER_IP='[dry-run]'
+else
+  SERVER_IP="$(server_ipv6 "${SERVER_NAME:?}" 2>/dev/null || server_ipv4 "${SERVER_NAME:?}")"
+fi
+
+cleanup_ssh() {
+  debug cleanup_ssh
+
+  debug 'Removing SSH host key…'
+  edo log_as_debug_ ssh-keygen -R "${SERVER_IP:?}"
+  success 'SSH host key removed.'
+}
+
+if log_as_debug_ ssh-keygen -F "${SERVER_IP:?}"; then
+  error "Cannot connect to $(format_code "${SERVER_IP:?}"): Host key already exists for SSH"
+
+  if (( ${FORCE:-0} )); then
+    warn "$(format_code '--force') passed as input. Existing SSH host key will be removed."
+  else
+    ask_yes_no 'Continue anyway?' n || exit 1
+  fi
+
+  cleanup_ssh
+fi
+
+trap 'cleanup_ssh; cleanup_hetzner' EXIT
+
+SSH_TIMEOUT=60
+info "Waiting for SSH to be reachable… $(fg_black "(automatic timeout: ${SSH_TIMEOUT:?}s)")"
+start=$(date +%s)
+while true; do
+  status=$(edo timeout 1 bash -c "</dev/tcp/${SERVER_IP:?}/22" 2\>/dev/null; echo $?)
+
+  # See [timeout invocation (GNU Coreutils 9.9)](https://www.gnu.org/software/coreutils/manual/html_node/timeout-invocation.html).
+  case ${status:?} in
+    0) success 'SSH reachable'; break ;;
+    124|1) debug 'SSH unreachable' ;;
+    130) debug 'Ctrl+C'; exit 1 ;;
+    *) die "$(format_code timeout) returned unknown exit code ${status:?}" ;;
+  esac
+
+  if [ $(( $(date +%s) - start )) -ge ${SSH_TIMEOUT:?} ]; then
+    die "Timeout waiting for SSH"
+  fi
+
+  sleep 1
+done
+
+info "Opening the SSH connection… $(fg_yellow '(remember to tap your security card if needed)')"
+
+# PIPE=$(mktemp -u)
+# mkfifo "$PIPE"
+
+SSH_CONNECT_TIMEOUT=30
+# coproc SSH {
+#   if (( ${DRY_RUN:-0} )); then
+#     dry_run ssh -o StrictHostKeyChecking=accept-new -tt root@"${SERVER_IP:?}" \>"${TTY:-/dev/tty}" 2\>&1
+#     sleep 5
+#     exit 0
+#   else
+#     # NOTE: `StrictHostKeyChecking=accept-new` skips the host key verification,
+#     #   accepting only new keys (failing if a different one exists).
+#     # NOTE: `BatchMode=yes` means `ssh` will fails if it reaches a point where
+#     #   user input would be required for authentication (instead of waiting).
+#     ssh -tt \
+#       -o StrictHostKeyChecking=accept-new \
+#       -o ConnectTimeout="${SSH_CONNECT_TIMEOUT:?}" \
+#       root@"${SERVER_IP:?}" >"${TTY:-/dev/tty}" 2>&1 &
+#     ssh_pid=$!
+#     debug "SSH process started (pid=${ssh_pid:?})."
+
+#     cleanup_coproc() {
+#       debug cleanup_coproc
+
+#       # Kill the SSH process.
+#       log_as_debug_ kill -TERM "${ssh_pid:?}" || true
+
+#       # Wait for the SSH process to finish, and dismiss the exit code.
+#       wait "${ssh_pid:?}" || true
+#     }
+#     trap cleanup_coproc TERM
+
+#     wait "${ssh_pid:?}"
+#   fi
+
+#   debug 'SSH coprocess finished.'
+# }
+# ssh_coproc_pid=$SSH_PID
+# ssh_in=${SSH[1]}
+
+# # NOTE: Using a random name because `mkfifo` creates
+# ssh_fifo="$(mktemp -u)"
+# mkfifo "${ssh_fifo:?}"
+
+# # Open a new read/write named file descriptor to send data to `ssh`.
+# # NOTE: We could use the `ssh_fifo` file directly, but it’d get opened/closed
+# #   every time we need it and file descriptors would be created on the fly so
+# #   it’s more efficient to manage it ourselves.
+# exec {ssh_in}<>"$ssh_fifo"
+
+ssh_sock="$(mktemp -u)"
+
+# ssh -tt -M \
+#   -o StrictHostKeyChecking=accept-new \
+#   -o BatchMode=yes \
+#   -o ConnectTimeout="${SSH_CONNECT_TIMEOUT:?}" \
+#   -o ControlPath="$ssh_sock" \
+#   -o ControlPersist=yes \
+#   root@"${SERVER_IP:?}" <&${ssh_in:?} &
+# ssh_coproc_pid=$!
+
+# debug "SSH coprocess started (pid=$(format_code "${ssh_coproc_pid:?}"), ssh_in=$(format_code "${ssh_in:?}"), fifo=$(format_code "${ssh_fifo:?}"))."
+
+# NOTE: `StrictHostKeyChecking=accept-new` skips the host key verification,
+#   accepting only new keys (failing if a different one exists).
+# NOTE: `BatchMode=yes` means `ssh` will fails if it reaches a point where
+#   user input would be required for authentication (instead of waiting).
+# NOTE: `-N` means `ssh` will not open a shell and return as soon as
+#   authentication has succeeded.
+# NOTE: `-M` + `ControlPath` creates a master SSH connection we can later
+#   connect to. Coupled with `-N`, it allows us to open the SSH connection and
+#   only then send data (instead of buffering everything in stdin).
+# NOTE: `-n` prevents reading from stdin (we don’t need it).
+edo ssh -M -N -n \
+  -o ConnectTimeout="${SSH_CONNECT_TIMEOUT:?}" \
+  -o StrictHostKeyChecking=accept-new \
+  -o BatchMode=yes \
+  -o ControlPath="$ssh_sock" \
+  -o ControlPersist=30m \
+  root@"$SERVER_IP"
+
+close_ssh_master() {
+  debug close_ssh_master
+
+  [ -S "${ssh_sock:?}" ] && ssh -O exit -o ControlPath="$ssh_sock" root@"$SERVER_IP"
+}
+
+trap 'close_ssh_master; cleanup_ssh; cleanup_hetzner' EXIT
+
+# coproc SSH {
+#   debug 'SSH coprocess started.'
+
+#   ssh \
+#     -o ControlPath="$ssh_sock" \
+#     root@"${SERVER_IP:?}" >"${TTY:-/dev/tty}" 2>&1
+
+#   debug 'SSH coprocess finished.'
+# }
+# ssh_coproc_pid=$SSH_PID
+# ssh_in=${SSH[1]}
+# debug "SSH coprocess started (pid=$(format_code "${ssh_coproc_pid:?}"), ssh_in=$(format_code "${ssh_in:?}"))."
+
+# close_ssh() {
+#   debug close_ssh
+
+#   if kill -0 "${ssh_coproc_pid:?}" 2>/dev/null; then
+#     # Close the input file descriptor of the SSH coprocess.
+#     exec {ssh_in}>&-
+
+#     # Delete the FIFO file used for sending data to SSH.
+#     # rm "${ssh_fifo:?}"
+
+#     # Kill the SSH coprocess.
+#     log_as_debug_ kill -TERM "${ssh_coproc_pid:?}" || true
+
+#     # Wait for the SSH coprocess to finish, and dismiss the exit code.
+#     wait "${ssh_coproc_pid:?}" || true
+#   fi
+# }
+
+# trap 'close_ssh; close_ssh_master; cleanup_ssh; cleanup_hetzner' EXIT
+
+ssh_in() {
+  ssh -tt -o ControlPath="$ssh_sock" root@"${SERVER_IP:?}"
+}
+
+# ===== MAIN LOGIC =====
+
+debug 'Starting main logic…'
+
+cat <<SSH_END | tee >(ssh_in)
+curl -L https://get.prose.org > setup.sh
+head -n 10 setup.sh
+cat <<'SCRIPT_END' > setup.sh
+$(cat src/public/index.sh)
+SCRIPT_END
+head -n 10 setup.sh
+SSH_END
+
+question 'Press [Enter] to cleanup.'
+read -r line
+
+die temp
+
+cat <<SSH_END | tee >(ssh_in)
+cat setup.sh | sh
+SSH_END
+
+cat <<SSH_END | tee >(ssh_in)
+Test prose-get
+${SERVER_NAME:?}.${TEST_SUBDOMAIN:?}.${TEST_DOMAIN:?}
+${SERVER_NAME:?}.${TEST_SUBDOMAIN:?}.${TEST_DOMAIN:?}
+y
+mail.remibardon.com
+1025
+
+
+n
+hostmaster@remibardon.com
+y
+n
+SSH_END
+
+question 'Press [Enter] to cleanup.'
+read -r line
+
+debug exiting
+cat <<SSH_END | ssh_in
+exit
+SSH_END
+
+debug 'Waiting for SSH coprocess…'
+wait "${ssh_coproc_pid:?}"
+
+debug 'End of program reached.'
+
+# TODO: Download get.prose.org.
+# TODO: Read current get.prose.org script.
+# TODO: Update get.prose.org to current value.

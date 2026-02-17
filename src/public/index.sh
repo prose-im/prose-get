@@ -202,15 +202,7 @@ ask_yes_no() {
   }
 
   log_question_inline "$(printf '%s [%s]' "$question" "$(choices)")"
-  # NOTE: Reading with `-s` then `echo`ing is a trick to avoid printing
-  #   newlines when the user only hits [Enter]. `-s` hides user input,
-  #   which doesn’t print the user-induced `\n`, but `read` doesn’t
-  #   store trailing whitespaces in variables which means `$answer`
-  #   will be empty. `echo` will print the value the user entered if
-  #   any, plus a trailing `\n` which looks exactly like if we hadn’t
-  #   used `-s` in the first place.
-  read_tty -n 1 -s answer
-  echo_tty "${answer}"
+  read_tty -r answer
   case "${answer:-"$yes_no_default"}" in
     y|Y) return 0 ;;
     n|N|*) return 1 ;;

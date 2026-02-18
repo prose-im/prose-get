@@ -497,27 +497,27 @@ step_prose_config() {
   prose_get_file templates/prose-scripting.toml "${PROSE_CONFIG_FILE:?}"
 
   # Fill the file with answers from the user.
+  set_config() {
+    local key="${1:?Expected a config name}"
+    local value="${2:?Expected a value}"
+    dim edo sed -i -E -e "s~\\{${key}\\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
+  }
+
+  set_config_opt() {
+    local key="${1:?Expected a config name}"
+    local value="${2?Expected a value}"
+    if [ -n "${value-}" ]; then
+      dim edo sed -i -E -e "s~\\{${key}\\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
+    else
+      dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
+    fi
+  }
+
+  set_config company_name "${COMPANY_NAME:?}"
+
+  set_config pod_domain "${PROSE_POD_DOMAIN:?}"
+
   if [ -n "${SMTP_HOST-}" ]; then
-    set_config() {
-      local key="${1:?Expected a config name}"
-      local value="${2:?Expected a value}"
-      dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
-    }
-
-    set_config_opt() {
-      local key="${1:?Expected a config name}"
-      local value="${2?Expected a value}"
-      if [ -n "${value-}" ]; then
-        dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
-      else
-        dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
-      fi
-    }
-
-    set_config company_name "${COMPANY_NAME:?}"
-
-    set_config pod_domain "${PROSE_POD_DOMAIN:?}"
-
     set_config smtp_host "${SMTP_HOST:?}"
 
     set_config_opt smtp_port "${SMTP_PORT-}"

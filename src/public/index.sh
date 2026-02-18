@@ -542,7 +542,7 @@ step_ssl_certificates_prosody() {
   fi
 
   local cert_renewal_conf_file="/etc/letsencrypt/renewal/${APEX_DOMAIN:?}.conf"
-  local post_hook="/bin/bash -c 'rsync -aL --chown=prose:prose /etc/letsencrypt/live/\"${APEX_DOMAIN:?}\"/ /etc/prosody/certs/\"${APEX_DOMAIN:?}\"/'"
+  local post_hook="/bin/sh -c 'rsync -aL --chown=prose:prose /etc/letsencrypt/live/\"${APEX_DOMAIN:?}\"/ /etc/prosody/certs/\"${APEX_DOMAIN:?}\"/'"
   if edo certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"; then
     dim edo rsync -aL --chown=prose:prose /etc/letsencrypt/live/"${APEX_DOMAIN:?}"/ /etc/prosody/certs/"${APEX_DOMAIN:?}"/
 

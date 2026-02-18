@@ -270,6 +270,12 @@ link_dashboard() {
   format_hyperlink "admin.${PROSE_POD_DOMAIN:?}" "https://admin.${PROSE_POD_DOMAIN:?}"
 }
 
+trap_exit() {
+  printf "${A_RESET}"
+}
+
+trap trap_exit EXIT
+
 
 # === POSIX-compliant fake arrays ===
 

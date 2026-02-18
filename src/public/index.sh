@@ -72,16 +72,16 @@ log_error() {
 }
 
 log_success() {
-  printf_tty "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(printf "%s" "$*" | decolor)"
+  printf_tty "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}✓${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 log_task_success() {
-  printf_tty "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_GREEN}·${C_RESET}" "$*"
 }
 log_task_maybe() {
-  printf_tty "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_YELLOW}·${C_RESET}" "$*"
 }
 log_task_todo() {
-  printf_tty "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_RED}·${C_RESET}" "$*"
 }
 log_question() {
   printf_tty "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
@@ -110,7 +110,7 @@ section_end() {
   log_success "$@"
 }
 section_end_todo() {
-  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
+  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}✗${C_RESET}" "$*"
 }
 
 

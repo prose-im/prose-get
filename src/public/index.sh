@@ -270,6 +270,12 @@ link_dashboard() {
   format_hyperlink "admin.${PROSE_POD_DOMAIN:?}" "https://admin.${PROSE_POD_DOMAIN:?}"
 }
 
+trap_exit() {
+  printf "${A_RESET}"
+}
+
+trap trap_exit EXIT
+
 
 # === POSIX-compliant fake arrays ===
 
@@ -491,27 +497,27 @@ step_prose_config() {
   prose_get_file templates/prose-scripting.toml "${PROSE_CONFIG_FILE:?}"
 
   # Fill the file with answers from the user.
+  set_config() {
+    local key="${1:?Expected a config name}"
+    local value="${2:?Expected a value}"
+    dim edo sed -i -E -e "s~\\{${key}\\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
+  }
+
+  set_config_opt() {
+    local key="${1:?Expected a config name}"
+    local value="${2?Expected a value}"
+    if [ -n "${value-}" ]; then
+      dim edo sed -i -E -e "s~\\{${key}\\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
+    else
+      dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
+    fi
+  }
+
+  set_config company_name "${COMPANY_NAME:?}"
+
+  set_config pod_domain "${PROSE_POD_DOMAIN:?}"
+
   if [ -n "${SMTP_HOST-}" ]; then
-    set_config() {
-      local key="${1:?Expected a config name}"
-      local value="${2:?Expected a value}"
-      dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
-    }
-
-    set_config_opt() {
-      local key="${1:?Expected a config name}"
-      local value="${2?Expected a value}"
-      if [ -n "${value-}" ]; then
-        dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
-      else
-        dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
-      fi
-    }
-
-    set_config company_name "${COMPANY_NAME:?}"
-
-    set_config pod_domain "${PROSE_POD_DOMAIN:?}"
-
     set_config smtp_host "${SMTP_HOST:?}"
 
     set_config_opt smtp_port "${SMTP_PORT-}"
@@ -542,9 +548,9 @@ step_ssl_certificates_prosody() {
   fi
 
   local cert_renewal_conf_file="/etc/letsencrypt/renewal/${APEX_DOMAIN:?}.conf"
-  local post_hook="/bin/bash -c 'rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/\"${APEX_DOMAIN:?}\"/'"
+  local post_hook="/bin/sh -c 'rsync -aL --chown=prose:prose /etc/letsencrypt/live/\"${APEX_DOMAIN:?}\"/ /etc/prosody/certs/\"${APEX_DOMAIN:?}\"/'"
   if edo certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"; then
-    dim edo_complex "rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/'${APEX_DOMAIN:?}'/"
+    dim edo rsync -aL --chown=prose:prose /etc/letsencrypt/live/"${APEX_DOMAIN:?}"/ /etc/prosody/certs/"${APEX_DOMAIN:?}"/
 
     if grep -q 'post_hook' "${cert_renewal_conf_file:?}"; then
       if grep -q 'prosody/certs' "${cert_renewal_conf_file:?}"; then
@@ -611,9 +617,11 @@ step_reverse_proxy() {
 
   prose_get_file templates/nginx.conf /etc/nginx/sites-available/"${PROSE_POD_DOMAIN:?}"
 
-  dim edo_complex "ln -s /etc/nginx/sites-{available,enabled}/'${PROSE_POD_DOMAIN:?}' >/dev/null"
+  if [ ! -e /etc/nginx/sites-enabled/"${PROSE_POD_DOMAIN:?}" ]; then
+    dim edo_complex "ln -s /etc/nginx/sites-available/'${PROSE_POD_DOMAIN:?}' /etc/nginx/sites-enabled/'${PROSE_POD_DOMAIN:?}' >/dev/null"
+  fi
 
-  dim edo systemctl -q reload nginx
+  dim edo systemctl -q reload nginx || dim edo systemctl -q start nginx
 
   local well_known_dir="$(find /var/www -type d -name *well-known)"
   if [ -n "${well_known_dir-}" ]; then
@@ -625,8 +633,10 @@ step_reverse_proxy() {
     prose_get_file templates/host-meta "${well_known_dir:?}"/host-meta
     prose_get_file templates/host-meta.json "${well_known_dir:?}"/host-meta.json
     prose_get_file templates/nginx-well-known.conf /etc/nginx/sites-available/"${APEX_DOMAIN:?}"
-    dim edo_complex "ln -s /etc/nginx/sites-{available,enabled}/'${APEX_DOMAIN:?}' >/dev/null"
-    dim edo systemctl -q reload nginx
+    if [ ! -e /etc/nginx/sites-enabled/"${APEX_DOMAIN:?}" ]; then
+      dim edo_complex "ln -s /etc/nginx/sites-available/'${APEX_DOMAIN:?}' /etc/nginx/sites-enabled/'${APEX_DOMAIN:?}' >/dev/null"
+    fi
+    dim edo systemctl -q reload nginx || dim edo systemctl -q start nginx
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 

@@ -466,7 +466,7 @@ step_create_dirs_and_files() {
 
   # Directories
   prose_create_dir 750 \
-    /var/lib/{prose-pod-api,prosody} \
+    /var/lib/{prose-pod-server,prose-pod-api,prosody} \
     /etc/{prose,prosody} \
     /etc/prosody/certs
 

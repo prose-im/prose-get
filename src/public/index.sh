@@ -424,8 +424,7 @@ step_questions() {
     read_tty -r SMTP_USER
 
     log_question_inline '  - SMTP password:'
-    read_tty -r -s SMTP_PASS
-    echo_tty # Print empty line because `read -s` doesn’t.
+    read_tty -r SMTP_PASS
 
     ask_yes_no '  - Force SMTP encryption?' y && SMTP_ENCRYPT=true || SMTP_ENCRYPT=false
   else

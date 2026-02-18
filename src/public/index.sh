@@ -615,7 +615,7 @@ step_reverse_proxy() {
     dim edo_complex "ln -s /etc/nginx/sites-available/'${PROSE_POD_DOMAIN:?}' /etc/nginx/sites-enabled/'${PROSE_POD_DOMAIN:?}' >/dev/null"
   fi
 
-  dim edo systemctl -q reload nginx
+  dim edo systemctl -q reload nginx || dim edo systemctl -q start nginx
 
   local well_known_dir="$(find /var/www -type d -name *well-known)"
   if [ -n "${well_known_dir-}" ]; then
@@ -630,7 +630,7 @@ step_reverse_proxy() {
     if [ ! -e /etc/nginx/sites-enabled/"${APEX_DOMAIN:?}" ]; then
       dim edo_complex "ln -s /etc/nginx/sites-available/'${APEX_DOMAIN:?}' /etc/nginx/sites-enabled/'${APEX_DOMAIN:?}' >/dev/null"
     fi
-    dim edo systemctl -q reload nginx
+    dim edo systemctl -q reload nginx || dim edo systemctl -q start nginx
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 

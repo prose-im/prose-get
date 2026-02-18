@@ -443,14 +443,14 @@ step_create_user_and_group() {
   section_start "Creating the user and group…"
 
   # Create group.
-  if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" == "${PROSE_GROUP_NAME:?}" ]; then
+  if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" = "${PROSE_GROUP_NAME:?}" ]; then
     log_trace "Group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") already exists."
   else
     dim edo addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}" >/dev/null
   fi
 
   # Create user.
-  if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" == "${PROSE_USER_NAME:?}" ]; then
+  if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" = "${PROSE_USER_NAME:?}" ]; then
     log_trace "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") already exists."
   else
     dim edo adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}" >/dev/null

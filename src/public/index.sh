@@ -613,35 +613,34 @@ step_patches() {
   # NOTE: See <https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/>.
   local compose_patch_file="${PROSE_COMPOSE_FILE%".yaml"}.override.yaml"
 
-  log_info "Disabling nginx cache-control in the Dashboard…"
-  local upstream_dashboard_site_conf_url=https://raw.githubusercontent.com/prose-im/prose-pod-dashboard/refs/heads/master/env/nginx/site.conf
-  local dashboard_site_conf_path=/etc/prose/dashboard-nginx-site.conf
-  # NOTE: The file might have been moved on `master`, we mustn’t fail if so.
-  if dim edo_complex "curl -s -L '${upstream_dashboard_site_conf_url}' -o '${dashboard_site_conf_path}' 2>/dev/null"; then
-    # If upstream hasn’t been patched already, patch it and use the patch.
-    if grep -q '^expires 1h;$' "$dashboard_site_conf_path"; then
-      prose_fix_permissions file "$dashboard_site_conf_path"
+  local dashboard_package_json_url=https://raw.githubusercontent.com/prose-im/prose-pod-dashboard/refs/heads/master/package.json
 
-      log_task_success "Created file $(format_path "$dashboard_site_conf_path")."
+  # TODO: Remove once <https://github.com/prose-im/prose-pod-dashboard/commit/c765026ce7eb08734d58cd95d8800386b571d3f3> makes it into a release.
+  # NOTE: Patch is only for `prose-pod-dashboard:0.3.2`, the next release will
+  #   contain a fix.
+  if dim edo_complex "curl -s -L '${dashboard_package_json_url}' | grep -q '^  \"version\": \"0.3.2\",\$'"; then
+    log_info "Patching nginx cache-control in the Dashboard…"
 
-      sed -i 's/^expires 1h;$/#expires 1h; # Disabled by get.prose.org patch./' "$dashboard_site_conf_path"
+    local patched_dashboard_site_conf_url=https://raw.githubusercontent.com/prose-im/prose-pod-dashboard/c765026ce7eb08734d58cd95d8800386b571d3f3/env/nginx/site.conf
+    local dashboard_site_conf_path=/etc/prose/dashboard-nginx-site.conf
+    dim edo curl -s -L "${patched_dashboard_site_conf_url}" -o "${dashboard_site_conf_path}"
 
-      cat <<'EOF' >> "$compose_patch_file"
+    prose_fix_permissions file "$dashboard_site_conf_path"
+
+    log_task_success "Created file $(format_path "$dashboard_site_conf_path")."
+
+    cat <<'EOF' >> "$compose_patch_file"
 services:
   dashboard:
     volumes:
       - '/etc/prose/dashboard-nginx-site.conf:/etc/nginx/site.conf:ro'
 EOF
 
-      prose_fix_permissions file "$compose_patch_file"
+    prose_fix_permissions file "$compose_patch_file"
 
-      log_task_success "Created file $(format_path "$compose_patch_file")."
-    else
-      # If upstream has been patched, remove this useless file.
-      rm "$dashboard_site_conf_path"
-
-      log_trace 'nginx cache-control already disabled in upstream Dashboard.'
-    fi
+    log_task_success "Created file $(format_path "$compose_patch_file")."
+  else
+    log_trace 'nginx cache-control already patched in upstream Dashboard.'
   fi
 
   section_end 'Applied patches.'

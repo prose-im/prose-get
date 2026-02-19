@@ -250,6 +250,18 @@ prose_get_file() {
   log_task_success "Created file $(format_path "$out_path")."
 }
 
+prose_fix_permissions() {
+  local path="${2:?"Expected a path a asecond argument"}"
+
+  case "$1" in
+    file)
+      dim edo chown prose:prose "$path"
+      dim edo chmod 640 "$path"
+      ;;
+    *) die "prose_fix_permissions: Unsupported file type: '$1'." ;;
+  esac
+}
+
 log_contact_assistance() {
   log_info "Please contact our technical support team at $(format_hyperlink "https://prose.org/contact/" "https://prose.org/contact/") for further assistance."
 }
@@ -594,6 +606,47 @@ step_docker_compose() {
   section_end 'Prose is ready to run.'
 }
 run_step_if_not_skipped docker_compose
+
+step_patches() {
+  section_start 'Applying some patches…'
+
+  # NOTE: See <https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/>.
+  local compose_patch_file="${PROSE_COMPOSE_FILE%".yaml"}.override.yaml"
+
+  log_info "Disabling nginx cache-control in the Dashboard…"
+  local upstream_dashboard_site_conf_url=https://raw.githubusercontent.com/prose-im/prose-pod-dashboard/refs/heads/master/env/nginx/site.conf
+  local dashboard_site_conf_path=/etc/prose/dashboard-nginx-site.conf
+  # NOTE: The file might have been moved on `master`, we mustn’t fail if so.
+  if dim edo_complex "curl -s -L '${upstream_dashboard_site_conf_url}' -o '${dashboard_site_conf_path}' 2>/dev/null"; then
+    # If upstream hasn’t been patched already, patch it and use the patch.
+    if grep -q '^expires 1h;$' "$dashboard_site_conf_path"; then
+      prose_fix_permissions file "$dashboard_site_conf_path"
+
+      log_task_success "Created file $(format_path "$dashboard_site_conf_path")."
+
+      sed -i 's/^expires 1h;$/#expires 1h; # Disabled by get.prose.org patch./' "$dashboard_site_conf_path"
+
+      cat <<'EOF' >> "$compose_patch_file"
+services:
+  dashboard:
+    volumes:
+      - '/etc/prose/dashboard-nginx-site.conf:/etc/nginx/site.conf:ro'
+EOF
+
+      prose_fix_permissions file "$compose_patch_file"
+
+      log_task_success "Created file $(format_path "$compose_patch_file")."
+    else
+      # If upstream has been patched, remove this useless file.
+      rm "$dashboard_site_conf_path"
+
+      log_trace 'nginx cache-control already disabled in upstream Dashboard.'
+    fi
+  fi
+
+  section_end 'Applied patches.'
+}
+run_step_if_not_skipped patches
 
 step_run_prose() {
   section_start 'Running Prose…'

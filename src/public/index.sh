@@ -72,16 +72,16 @@ log_error() {
 }
 
 log_success() {
-  printf_tty "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}\u2713${C_RESET}" "$(printf "%s" "$*" | decolor)"
+  printf_tty "${I_BOLD}%b ${C_GREEN}%s${C_RESET}${I_RESET}\n" "${C_GREEN}✓${C_RESET}" "$(printf "%s" "$*" | decolor)"
 }
 log_task_success() {
-  printf_tty "%b %s\n" "${C_GREEN}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_GREEN}·${C_RESET}" "$*"
 }
 log_task_maybe() {
-  printf_tty "%b %s\n" "${C_YELLOW}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_YELLOW}·${C_RESET}" "$*"
 }
 log_task_todo() {
-  printf_tty "%b %s\n" "${C_RED}\u00B7${C_RESET}" "$*"
+  printf_tty "%b %s\n" "${C_RED}·${C_RESET}" "$*"
 }
 log_question() {
   printf_tty "%b %s\n" "${C_CYAN}?${C_RESET}" "$*"
@@ -110,7 +110,7 @@ section_end() {
   log_success "$@"
 }
 section_end_todo() {
-  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}\u2717${C_RESET}" "$*"
+  printf_tty "${I_BOLD}%b ${C_YELLOW}%s${C_RESET}${I_RESET}\n" "${C_YELLOW}✗${C_RESET}" "$*"
 }
 
 
@@ -160,20 +160,22 @@ echo_tty() {
   echo "$@" > /dev/tty
 }
 
-# Allows passing a pipe as argument.
-REGEX_ALLOW_PIPES='s#\\|#|#'
-# Allows passing redirects (e.g. `2>&1`) as argument.
-REGEX_ALLOW_REDIRECTS='s#([[:digit:]]*)\\>(\\&[[:digit:]]+)?#\1>\2#'
 edo() {
   if [ "${DRY_RUN:-0}" -ne 0 ]; then
     log_dry_run "$*"
   else
     log_trace "$*"
-    # NOTE: `$@`, `"$@"` or `eval $@` would break spaces in arguments.
-    eval $(printf '%q ' "$@" | sed "${REGEX_ALLOW_PIPES:?}" | sed -E "${REGEX_ALLOW_REDIRECTS:?}") < /dev/tty > /dev/tty
+    "$@" < /dev/tty > /dev/tty
   fi
-  status=$?
-  return $status
+}
+
+edo_complex() {
+  if [ "${DRY_RUN:-0}" -ne 0 ]; then
+    log_dry_run "$*"
+  else
+    log_trace "$*"
+    sh -c "$@" < /dev/tty > /dev/tty
+  fi
 }
 
 dim() {
@@ -202,15 +204,7 @@ ask_yes_no() {
   }
 
   log_question_inline "$(printf '%s [%s]' "$question" "$(choices)")"
-  # NOTE: Reading with `-s` then `echo`ing is a trick to avoid printing
-  #   newlines when the user only hits [Enter]. `-s` hides user input,
-  #   which doesn’t print the user-induced `\n`, but `read` doesn’t
-  #   store trailing whitespaces in variables which means `$answer`
-  #   will be empty. `echo` will print the value the user entered if
-  #   any, plus a trailing `\n` which looks exactly like if we hadn’t
-  #   used `-s` in the first place.
-  read_tty -n 1 -s answer
-  echo_tty "${answer}"
+  read_tty -r answer
   case "${answer:-"$yes_no_default"}" in
     y|Y) return 0 ;;
     n|N|*) return 1 ;;
@@ -249,13 +243,23 @@ prose_get_file() {
   local in_path="${1:?Expected a path in prose-pod-system}"
   local out_path="${2:?Expected a path on the file system}"
 
-  dim edo curl -s -L "${PROSE_FILES:?}"/"$in_path" \
-    \| sed s/'{your_domain}'/"${APEX_DOMAIN:?}"/g \
-    \> "$out_path"
+  dim edo_complex "curl -s -L '${PROSE_FILES:?}/$in_path' | sed 's/{your_domain}/${APEX_DOMAIN:?}/g' > '$out_path'"
 
   dim edo chown prose:prose "$out_path"
 
   log_task_success "Created file $(format_path "$out_path")."
+}
+
+prose_fix_permissions() {
+  local path="${2:?"Expected a path a asecond argument"}"
+
+  case "$1" in
+    file)
+      dim edo chown prose:prose "$path"
+      dim edo chmod 640 "$path"
+      ;;
+    *) die "prose_fix_permissions: Unsupported file type: '$1'." ;;
+  esac
 }
 
 log_contact_assistance() {
@@ -277,6 +281,12 @@ link_app_web() {
 link_dashboard() {
   format_hyperlink "admin.${PROSE_POD_DOMAIN:?}" "https://admin.${PROSE_POD_DOMAIN:?}"
 }
+
+trap_exit() {
+  printf "${A_RESET}"
+}
+
+trap trap_exit EXIT
 
 
 # === POSIX-compliant fake arrays ===
@@ -432,8 +442,7 @@ step_questions() {
     read_tty -r SMTP_USER
 
     log_question_inline '  - SMTP password:'
-    read_tty -r -s SMTP_PASS
-    echo_tty # Print empty line because `read -s` doesn’t.
+    read_tty -r SMTP_PASS
 
     ask_yes_no '  - Force SMTP encryption?' y && SMTP_ENCRYPT=true || SMTP_ENCRYPT=false
   else
@@ -452,14 +461,14 @@ step_create_user_and_group() {
   section_start "Creating the user and group…"
 
   # Create group.
-  if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" == "${PROSE_GROUP_NAME:?}" ]; then
+  if [ "$(getent passwd "${PROSE_GID:?}" | cut -d: -f1)" = "${PROSE_GROUP_NAME:?}" ]; then
     log_trace "Group $(format_code "${PROSE_GROUP_NAME:?}(${PROSE_GID:?})") already exists."
   else
     dim edo addgroup --gid "${PROSE_GID:?}" "${PROSE_GROUP_NAME:?}" >/dev/null
   fi
 
   # Create user.
-  if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" == "${PROSE_USER_NAME:?}" ]; then
+  if [ "$(getent passwd "${PROSE_UID:?}" | cut -d: -f1)" = "${PROSE_USER_NAME:?}" ]; then
     log_trace "User $(format_code "${PROSE_USER_NAME:?}(${PROSE_UID:?})") already exists."
   else
     dim edo adduser --uid "${PROSE_UID:?}" --gid "${PROSE_GID:?}" --disabled-password --no-create-home --gecos 'Prose' "${PROSE_USER_NAME:?}" >/dev/null
@@ -474,8 +483,11 @@ step_create_dirs_and_files() {
 
   # Directories
   prose_create_dir 750 \
-    /var/lib/{prose-pod-api,prosody} \
-    /etc/{prose,prosody} \
+    /var/lib/prose-pod-server \
+    /var/lib/prose-pod-api \
+    /var/lib/prosody \
+    /etc/prose \
+    /etc/prosody \
     /etc/prosody/certs
 
   # Database
@@ -497,27 +509,27 @@ step_prose_config() {
   prose_get_file templates/prose-scripting.toml "${PROSE_CONFIG_FILE:?}"
 
   # Fill the file with answers from the user.
+  set_config() {
+    local key="${1:?Expected a config name}"
+    local value="${2:?Expected a value}"
+    dim edo sed -i -E -e "s~\\{${key}\\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
+  }
+
+  set_config_opt() {
+    local key="${1:?Expected a config name}"
+    local value="${2?Expected a value}"
+    if [ -n "${value-}" ]; then
+      dim edo sed -i -E -e "s~\\{${key}\\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
+    else
+      dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
+    fi
+  }
+
+  set_config company_name "${COMPANY_NAME:?}"
+
+  set_config pod_domain "${PROSE_POD_DOMAIN:?}"
+
   if [ -n "${SMTP_HOST-}" ]; then
-    set_config() {
-      local key="${1:?Expected a config name}"
-      local value="${2:?Expected a value}"
-      dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
-    }
-
-    set_config_opt() {
-      local key="${1:?Expected a config name}"
-      local value="${2?Expected a value}"
-      if [ -n "${value-}" ]; then
-        dim edo sed -i -E -e "s~\{${key}\}~${value}~g" "${PROSE_CONFIG_FILE:?}"
-      else
-        dim edo sed -i -E -e 's~^(.*\{'"${key}"'\}.*)$~#\1~g' "${PROSE_CONFIG_FILE:?}"
-      fi
-    }
-
-    set_config company_name "${COMPANY_NAME:?}"
-
-    set_config pod_domain "${PROSE_POD_DOMAIN:?}"
-
     set_config smtp_host "${SMTP_HOST:?}"
 
     set_config_opt smtp_port "${SMTP_PORT-}"
@@ -548,9 +560,9 @@ step_ssl_certificates_prosody() {
   fi
 
   local cert_renewal_conf_file="/etc/letsencrypt/renewal/${APEX_DOMAIN:?}.conf"
-  local post_hook="/bin/bash -c 'rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/\"${APEX_DOMAIN:?}\"/'"
+  local post_hook="/bin/sh -c 'rsync -aL --chown=prose:prose /etc/letsencrypt/live/\"${APEX_DOMAIN:?}\"/ /etc/prosody/certs/\"${APEX_DOMAIN:?}\"/'"
   if edo certbot certonly --standalone -d "${APEX_DOMAIN:?}" -d groups."${APEX_DOMAIN:?}"; then
-    dim edo rsync -aL --chown=prose:prose /etc/{letsencrypt/live,prosody/certs}/"${APEX_DOMAIN:?}"/
+    dim edo rsync -aL --chown=prose:prose /etc/letsencrypt/live/"${APEX_DOMAIN:?}"/ /etc/prosody/certs/"${APEX_DOMAIN:?}"/
 
     if grep -q 'post_hook' "${cert_renewal_conf_file:?}"; then
       if grep -q 'prosody/certs' "${cert_renewal_conf_file:?}"; then
@@ -579,7 +591,7 @@ check_docker_compose_installed() {
 }
 install_docker() {
   log_info 'Installing Docker Compose…'
-  dim edo curl -s -L https://get.docker.com \| sh
+  dim edo_complex 'curl -s -L https://get.docker.com | sh'
 }
 step_docker_compose() {
   section_start 'Installing Prose using Docker Compose…'
@@ -594,6 +606,46 @@ step_docker_compose() {
   section_end 'Prose is ready to run.'
 }
 run_step_if_not_skipped docker_compose
+
+step_patches() {
+  section_start 'Applying some patches…'
+
+  # NOTE: See <https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/>.
+  local compose_patch_file="${PROSE_COMPOSE_FILE%".yaml"}.override.yaml"
+
+  local dashboard_package_json_url=https://raw.githubusercontent.com/prose-im/prose-pod-dashboard/refs/heads/master/package.json
+
+  # TODO: Remove once <https://github.com/prose-im/prose-pod-dashboard/commit/c765026ce7eb08734d58cd95d8800386b571d3f3> makes it into a release.
+  # NOTE: Patch is only for `prose-pod-dashboard:0.3.2`, the next release will
+  #   contain a fix.
+  if dim edo_complex "curl -s -L '${dashboard_package_json_url}' | grep -q '^  \"version\": \"0.3.2\",\$'"; then
+    log_info "Patching nginx cache-control in the Dashboard…"
+
+    local patched_dashboard_site_conf_url=https://raw.githubusercontent.com/prose-im/prose-pod-dashboard/c765026ce7eb08734d58cd95d8800386b571d3f3/env/nginx/site.conf
+    local dashboard_site_conf_path=/etc/prose/dashboard-nginx-site.conf
+    dim edo curl -s -L "${patched_dashboard_site_conf_url}" -o "${dashboard_site_conf_path}"
+
+    prose_fix_permissions file "$dashboard_site_conf_path"
+
+    log_task_success "Created file $(format_path "$dashboard_site_conf_path")."
+
+    cat <<'EOF' >> "$compose_patch_file"
+services:
+  dashboard:
+    volumes:
+      - '/etc/prose/dashboard-nginx-site.conf:/etc/nginx/site.conf:ro'
+EOF
+
+    prose_fix_permissions file "$compose_patch_file"
+
+    log_task_success "Created file $(format_path "$compose_patch_file")."
+  else
+    log_trace 'nginx cache-control already patched in upstream Dashboard.'
+  fi
+
+  section_end 'Applied patches.'
+}
+run_step_if_not_skipped patches
 
 step_run_prose() {
   section_start 'Running Prose…'
@@ -617,9 +669,11 @@ step_reverse_proxy() {
 
   prose_get_file templates/nginx.conf /etc/nginx/sites-available/"${PROSE_POD_DOMAIN:?}"
 
-  dim edo ln -s /etc/nginx/sites-{available,enabled}/"${PROSE_POD_DOMAIN:?}" >/dev/null
+  if [ ! -e /etc/nginx/sites-enabled/"${PROSE_POD_DOMAIN:?}" ]; then
+    dim edo_complex "ln -s /etc/nginx/sites-available/'${PROSE_POD_DOMAIN:?}' /etc/nginx/sites-enabled/'${PROSE_POD_DOMAIN:?}' >/dev/null"
+  fi
 
-  dim edo systemctl -q reload nginx
+  dim edo systemctl -q reload nginx || dim edo systemctl -q start nginx
 
   local well_known_dir="$(find /var/www -type d -name *well-known)"
   if [ -n "${well_known_dir-}" ]; then
@@ -631,8 +685,10 @@ step_reverse_proxy() {
     prose_get_file templates/host-meta "${well_known_dir:?}"/host-meta
     prose_get_file templates/host-meta.json "${well_known_dir:?}"/host-meta.json
     prose_get_file templates/nginx-well-known.conf /etc/nginx/sites-available/"${APEX_DOMAIN:?}"
-    dim edo ln -s /etc/nginx/sites-{available,enabled}/"${APEX_DOMAIN:?}" >/dev/null
-    dim edo systemctl -q reload nginx
+    if [ ! -e /etc/nginx/sites-enabled/"${APEX_DOMAIN:?}" ]; then
+      dim edo_complex "ln -s /etc/nginx/sites-available/'${APEX_DOMAIN:?}' /etc/nginx/sites-enabled/'${APEX_DOMAIN:?}' >/dev/null"
+    fi
+    dim edo systemctl -q reload nginx || dim edo systemctl -q start nginx
   fi
   : ${well_known_dir:=/var/www/default/.well-known}
 

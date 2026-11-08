@@ -67,5 +67,4 @@ jobs:
           NOMAD_TOKEN: ${{ secrets.NOMAD_TOKEN }}
           NOMAD_HTTP_AUTH: ${{ secrets.NOMAD_HTTP_AUTH }}
         run: |
-          nomad var get nomad/jobs/prose-get | \
-            nomad var put -out none - IMAGE_TAG=${{ needs.ship.outputs.revision }}
+          nomad var put -out none nomad/jobs/prose-get IMAGE_TAG=${{ needs.ship.outputs.revision }}
